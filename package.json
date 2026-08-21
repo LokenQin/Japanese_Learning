@@ -1,0 +1,43 @@
+{
+  "name": "kotoba-language-learning",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c blue,green \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "node --watch server/index.js",
+    "build": "tsc -b && vite build && npm run build:static",
+    "build:static": "esbuild src/main.tsx --bundle --format=iife --platform=browser --target=es2020 --jsx=automatic --minify --outfile=static/app.js",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "start": "node server/index.js",
+    "db:init": "node server/init-db.js",
+    "test:cloud": "node scripts/cloud-smoke.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "mysql2": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "esbuild": "latest",
+    "globals": "latest",
+    "playwright-core": "^1.62.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "latest"
+  }
+}

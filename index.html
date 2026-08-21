@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f6f2" />
+    <meta name="description" content="从零开始学习日语、英语和西班牙语的监督工具" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23c5483d'/%3E%3Ctext x='32' y='43' fill='white' font-family='serif' font-size='35' text-anchor='middle'%3E%E3%81%93%3C/text%3E%3C/svg%3E" />
+    <title>ことば · 多语言学习</title>
+  </head>
+  <body>
+    <div id="root">
+      <div style="min-height:100vh;display:grid;place-items:center;font-family:'Microsoft YaHei',sans-serif;color:#272824;background:#f5f4f0">
+        <p>正在载入语言学习工具...</p>
+      </div>
+    </div>
+    <script type="module">
+      if (window.location.protocol !== 'file:') {
+        import('/src/main.tsx')
+      }
+    </script>
+    <script>
+      if (window.location.protocol === 'file:') {
+        const stylesheet = document.createElement('link')
+        stylesheet.rel = 'stylesheet'
+        stylesheet.href = './static/app.css'
+        document.head.appendChild(stylesheet)
+
+        const app = document.createElement('script')
+        app.src = './static/app.js'
+        document.body.appendChild(app)
+      }
+    </script>
+  </body>
+</html>

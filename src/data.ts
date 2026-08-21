@@ -1,0 +1,132 @@
+import type { AppState, CardGroup, LanguageCode, ReviewCard } from './types'
+
+export interface FoundationEntry { symbol: string; reading: string; row: string; hint: string }
+export interface VocabEntry { word: string; reading: string; meaning: string; hint: string }
+export interface Course { id: string; index: string; title: string; subtitle: string; description: string; lessons: number; duration: string }
+export interface LanguagePack {
+  code: LanguageCode; name: string; nativeName: string; locale: string; brandMark: string; greeting: string
+  pathDescription: string; quote: { native: string; translation: string }
+  foundationLabel: string; foundationPrompt: string; vocabularyLabel: string; vocabularyPrompt: string
+  foundationEntries: FoundationEntry[]; vocabEntries: VocabEntry[]; reviewCards: ReviewCard[]
+  dailyTasks: AppState['tasks']; courses: Course[]; preview: readonly (readonly [string, string])[]
+}
+
+const japaneseFoundation: FoundationEntry[] = [
+  ['あ', 'a', 'あ行'], ['い', 'i', 'あ行'], ['う', 'u', 'あ行'], ['え', 'e', 'あ行'], ['お', 'o', 'あ行'],
+  ['か', 'ka', 'か行'], ['き', 'ki', 'か行'], ['く', 'ku', 'か行'], ['け', 'ke', 'か行'], ['こ', 'ko', 'か行'],
+  ['さ', 'sa', 'さ行'], ['し', 'shi', 'さ行'], ['す', 'su', 'さ行'], ['せ', 'se', 'さ行'], ['そ', 'so', 'さ行'],
+  ['た', 'ta', 'た行'], ['ち', 'chi', 'た行'], ['つ', 'tsu', 'た行'], ['て', 'te', 'た行'], ['と', 'to', 'た行'],
+  ['な', 'na', 'な行'], ['に', 'ni', 'な行'], ['ぬ', 'nu', 'な行'], ['ね', 'ne', 'な行'], ['の', 'no', 'な行'],
+  ['は', 'ha', 'は行'], ['ひ', 'hi', 'は行'], ['ふ', 'fu', 'は行'], ['へ', 'he', 'は行'], ['ほ', 'ho', 'は行'],
+  ['ま', 'ma', 'ま行'], ['み', 'mi', 'ま行'], ['む', 'mu', 'ま行'], ['め', 'me', 'ま行'], ['も', 'mo', 'ま行'],
+  ['や', 'ya', 'や行'], ['ゆ', 'yu', 'や行'], ['よ', 'yo', 'や行'], ['ら', 'ra', 'ら行'], ['り', 'ri', 'ら行'],
+  ['る', 'ru', 'ら行'], ['れ', 're', 'ら行'], ['ろ', 'ro', 'ら行'], ['わ', 'wa', 'わ行'], ['を', 'wo', 'わ行'], ['ん', 'n', 'わ行'],
+].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}平假名，读作 ${reading}` }))
+
+const japaneseVocab: VocabEntry[] = [
+  ['おはよう', 'ohayou', '早上好', '早晨见面时使用'], ['こんにちは', 'konnichiwa', '你好', '白天见面时使用'],
+  ['こんばんは', 'konbanwa', '晚上好', '傍晚见面时使用'], ['ありがとう', 'arigatou', '谢谢', '表达感谢'],
+  ['すみません', 'sumimasen', '不好意思 / 劳驾', '道歉或搭话前使用'], ['さようなら', 'sayounara', '再见', '较长时间的道别'],
+  ['はじめまして', 'hajimemashite', '初次见面', '第一次见面时使用'], ['おやすみ', 'oyasumi', '晚安', '睡前道别'],
+  ['はい', 'hai', '是 / 好的', '肯定回答'], ['いいえ', 'iie', '不 / 不是', '否定回答'],
+].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+
+const englishFoundation: FoundationEntry[] = [
+  ['A', 'eɪ', '元音'], ['E', 'iː', '元音'], ['I', 'aɪ', '元音'], ['O', 'oʊ', '元音'], ['U', 'juː', '元音'],
+  ['TH', 'θ / ð', '辅音组合'], ['SH', 'ʃ', '辅音组合'], ['CH', 'tʃ', '辅音组合'], ['R', 'r', '易错辅音'], ['L', 'l', '易错辅音'],
+].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}发音，留意口型与舌位` }))
+
+const englishVocab: VocabEntry[] = [
+  ['hello', 'həˈloʊ', '你好', '通用问候'], ['morning', 'ˈmɔːrnɪŋ', '早晨', 'Good morning 的核心词'],
+  ['thanks', 'θæŋks', '谢谢', '日常感谢'], ['please', 'pliːz', '请', '礼貌请求'], ['sorry', 'ˈsɑːri', '对不起', '表达歉意'],
+  ['welcome', 'ˈwelkəm', '欢迎', '欢迎对方'], ['yes', 'jes', '是', '肯定回答'], ['no', 'noʊ', '不', '否定回答'],
+  ['goodbye', 'ˌɡʊdˈbaɪ', '再见', '告别用语'], ['friend', 'frend', '朋友', '介绍人际关系'],
+].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+
+const spanishFoundation: FoundationEntry[] = [
+  ['A', 'a', '元音'], ['E', 'e', '元音'], ['I', 'i', '元音'], ['O', 'o', '元音'], ['U', 'u', '元音'],
+  ['Ñ', 'eñe', '特殊字母'], ['J', 'jota', '特殊发音'], ['LL', 'elle', '字母组合'], ['RR', 'erre', '颤音'], ['H', 'hache', '不发音字母'],
+].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}，注意西班牙语的稳定发音规则` }))
+
+const spanishVocab: VocabEntry[] = [
+  ['hola', 'o-la', '你好', '通用问候'], ['buenos días', 'bwe-nos di-as', '早上好', '上午问候'], ['gracias', 'gra-sias', '谢谢', '表达感谢'],
+  ['por favor', 'por fa-bor', '请', '礼貌请求'], ['perdón', 'per-don', '对不起', '表达歉意'], ['bienvenido', 'byen-be-ni-do', '欢迎', '欢迎对方'],
+  ['sí', 'si', '是', '肯定回答'], ['no', 'no', '不', '否定回答'], ['adiós', 'a-dios', '再见', '告别用语'],
+  ['amigo', 'a-mi-go', '朋友', '男性朋友；女性用 amiga'],
+].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+
+function cards(code: LanguageCode, foundation: FoundationEntry[], vocab: VocabEntry[]): ReviewCard[] {
+  return [
+    ...foundation.map((entry) => ({ id: `${code}-kana-${entry.symbol}`, prompt: entry.symbol, reading: entry.reading, answer: entry.row, hint: entry.hint, group: 'kana' as CardGroup })),
+    ...vocab.map((entry) => ({ id: `${code}-vocab-${entry.word}`, prompt: entry.word, reading: entry.reading, answer: entry.meaning, hint: entry.hint, group: 'vocab' as CardGroup })),
+  ]
+}
+
+function tasks(code: LanguageCode, foundationLabel: string): AppState['tasks'] {
+  return [
+    { id: `${code}-foundation`, title: `${foundationLabel} · 认读练习`, description: `掌握${foundationLabel}的基础读音`, duration: 8, kind: 'kana', completed: false },
+    { id: `${code}-vocabulary`, title: '日常问候与核心词汇', description: '学习最常用的入门表达', duration: 10, kind: 'vocabulary', completed: false },
+    { id: `${code}-listening`, title: '听音辨认', description: '听读音选出正确内容', duration: 5, kind: 'listening', completed: false },
+    { id: `${code}-review`, title: '记忆复习', description: '完成今天到期的复习卡片', duration: 7, kind: 'review', completed: false },
+  ]
+}
+
+function pack(config: Omit<LanguagePack, 'reviewCards' | 'dailyTasks' | 'preview'>): LanguagePack {
+  return { ...config, reviewCards: cards(config.code, config.foundationEntries, config.vocabEntries), dailyTasks: tasks(config.code, config.foundationLabel), preview: config.foundationEntries.slice(0, 5).map((entry) => [entry.symbol, entry.reading] as const) }
+}
+
+export const languagePacks: Record<LanguageCode, LanguagePack> = {
+  ja: pack({
+    code: 'ja', name: '日语', nativeName: '日本語', locale: 'ja-JP', brandMark: 'こ', greeting: 'おはよう',
+    pathDescription: '循序完成每个阶段，打好日语基础。', quote: { native: '継続は力なり', translation: '坚持就是力量' },
+    foundationLabel: '平假名', foundationPrompt: '请读出这个假名', vocabularyLabel: '基础词汇', vocabularyPrompt: '请说出这个词的意思', foundationEntries: japaneseFoundation, vocabEntries: japaneseVocab,
+    courses: [
+      { id: 'hiragana', index: '01', title: '平假名入门', subtitle: 'Hiragana', description: '掌握 46 个基础平假名及其发音', lessons: 10, duration: '7 天' },
+      { id: 'katakana', index: '02', title: '片假名入门', subtitle: 'Katakana', description: '读写常用于外来语的片假名', lessons: 10, duration: '7 天' },
+      { id: 'greetings', index: '03', title: '问候与自我介绍', subtitle: 'Greetings', description: '完成第一次简单的日语交流', lessons: 8, duration: '6 天' },
+      { id: 'sentences', index: '04', title: '第一组基础句型', subtitle: 'Basic sentences', description: '理解「は」「です」的基本用法', lessons: 12, duration: '9 天' },
+    ],
+  }),
+  en: pack({
+    code: 'en', name: '英语', nativeName: 'English', locale: 'en-US', brandMark: 'A', greeting: 'Good morning',
+    pathDescription: '从发音和高频表达开始，建立英语交流基础。', quote: { native: 'Practice makes progress.', translation: '练习带来进步' },
+    foundationLabel: '字母与发音', foundationPrompt: '请读出这个字母或音组', vocabularyLabel: '核心词汇', vocabularyPrompt: '请说出这个词的意思', foundationEntries: englishFoundation, vocabEntries: englishVocab,
+    courses: [
+      { id: 'sounds', index: '01', title: '字母与核心发音', subtitle: 'Sounds', description: '掌握元音和常见易错辅音', lessons: 8, duration: '6 天' },
+      { id: 'greetings', index: '02', title: '日常问候', subtitle: 'Greetings', description: '自然地问候、感谢和道别', lessons: 8, duration: '6 天' },
+      { id: 'introductions', index: '03', title: '自我介绍', subtitle: 'Introductions', description: '介绍姓名、职业和兴趣', lessons: 10, duration: '8 天' },
+      { id: 'sentences', index: '04', title: '基础句型', subtitle: 'Basic sentences', description: '使用 be 动词和一般现在时表达', lessons: 12, duration: '9 天' },
+    ],
+  }),
+  es: pack({
+    code: 'es', name: '西班牙语', nativeName: 'Español', locale: 'es-ES', brandMark: 'Ñ', greeting: 'Buenos días',
+    pathDescription: '先掌握稳定的发音规则，再进入日常西语表达。', quote: { native: 'Poco a poco se llega lejos.', translation: '一步一步，终能走远' },
+    foundationLabel: '字母与发音', foundationPrompt: '请读出这个西语字母或音组', vocabularyLabel: '核心词汇', vocabularyPrompt: '请说出这个词的意思', foundationEntries: spanishFoundation, vocabEntries: spanishVocab,
+    courses: [
+      { id: 'pronunciation', index: '01', title: '西语发音规则', subtitle: 'Pronunciación', description: '掌握元音、特殊字母和颤音', lessons: 8, duration: '6 天' },
+      { id: 'greetings', index: '02', title: '问候与礼貌表达', subtitle: 'Saludos', description: '学会问候、感谢和道别', lessons: 8, duration: '6 天' },
+      { id: 'introductions', index: '03', title: '自我介绍', subtitle: 'Presentarse', description: '介绍姓名、国籍和职业', lessons: 10, duration: '8 天' },
+      { id: 'sentences', index: '04', title: '基础句型', subtitle: 'Frases básicas', description: '理解 ser、estar 和名词阴阳性', lessons: 12, duration: '9 天' },
+    ],
+  }),
+}
+
+export const languageOptions = (Object.keys(languagePacks) as LanguageCode[]).map((code) => languagePacks[code])
+export function getLanguagePack(code: LanguageCode): LanguagePack { return languagePacks[code] }
+
+export function createInitialState(code: LanguageCode): AppState {
+  return { tasks: languagePacks[code].dailyTasks.map((task) => ({ ...task })), taskDate: '', studyLog: {}, quizStats: {}, cardProgress: {}, lessonsCompleted: 0, dailyGoal: 30, reminderEnabled: true, soundEnabled: true, strictMode: false, reminderTime: '20:00' }
+}
+
+export function totalLessons(pack: LanguagePack): number { return pack.courses.reduce((sum, course) => sum + course.lessons, 0) }
+export function courseProgress(pack: LanguagePack, lessonsCompleted: number) {
+  let cumulative = 0
+  const rows = pack.courses.map((course) => {
+    const start = cumulative; cumulative += course.lessons
+    const completedLessons = Math.max(0, Math.min(course.lessons, lessonsCompleted - start))
+    return { course, completedLessons, percent: Math.round((completedLessons / course.lessons) * 100), unlocked: start <= lessonsCompleted, active: false }
+  })
+  const activeIndex = rows.findIndex((row) => row.completedLessons < row.course.lessons)
+  if (activeIndex >= 0) rows[activeIndex].active = true
+  return rows
+}
