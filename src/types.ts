@@ -24,6 +24,9 @@ export interface ReviewCard {
   answer: string
   hint: string
   group: CardGroup
+  speakText: string
+  example?: string
+  exampleMeaning?: string
 }
 
 export interface CardProgress {

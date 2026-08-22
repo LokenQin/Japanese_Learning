@@ -112,6 +112,15 @@ for (const viewport of [
     documentWidth: await page.evaluate(() => document.documentElement.scrollWidth),
     errors,
   })
+  if (viewport.name === 'mobile') {
+    await page.locator('.task-row').filter({ hasText: '日常问候与核心词汇' }).locator('.task-copy').click()
+    await page.getByText('hello', { exact: true }).waitFor()
+    await page.getByRole('button', { name: '你好', exact: true }).click()
+    await page.getByRole('button', { name: '检查答案' }).click()
+    await page.getByRole('button', { name: '播放例句：Hello, nice to meet you.' }).waitFor()
+    await page.screenshot({ path: 'artifacts/audio-lesson-mobile.png', fullPage: true })
+    results.push({ viewport: 'audio-lesson-mobile', documentWidth: await page.evaluate(() => document.documentElement.scrollWidth), errors })
+  }
   await page.close()
 }
 
@@ -155,7 +164,8 @@ results.push({ interaction: 'lesson-completion', lessonSummaryVisible, ...lesson
 await interactionPage.locator('.side-nav button', { hasText: '复习' }).click()
 await interactionPage.getByText('记忆复习').waitFor()
 const queueCountBefore = await interactionPage.locator('.queue-title strong').textContent()
-await interactionPage.locator('.flashcard').click()
+const reviewAudioVisible = await interactionPage.getByRole('button', { name: '播放读音：あ' }).isVisible()
+await interactionPage.getByRole('button', { name: '显示答案' }).click()
 await interactionPage.getByRole('button', { name: '记得' }).click()
 const queueCountAfter = await interactionPage.locator('.queue-title strong').textContent()
 await interactionPage.waitForTimeout(900)
@@ -163,6 +173,7 @@ results.push({
   interaction: 'spaced-review',
   queueCountBefore: Number(queueCountBefore),
   queueCountAfter: Number(queueCountAfter),
+  reviewAudioVisible,
   cardScheduled: profile('ja')?.cardProgress?.['ja-kana-あ']?.reps === 1,
   reviewTaskStillOpen: profile('ja')?.tasks?.find((task) => task.kind === 'review')?.completed === false,
 })
@@ -184,6 +195,17 @@ results.push({
   japaneseLessonPreserved: profile('ja')?.lessonsCompleted === 1,
   englishProgressIndependent: profile('en')?.lessonsCompleted === 0,
 })
+
+// 单词和例句都有独立的播放入口。
+await interactionPage.locator('.task-row').filter({ hasText: '日常问候与核心词汇' }).locator('.task-copy').click()
+await interactionPage.getByText('hello', { exact: true }).waitFor()
+const wordAudioVisible = await interactionPage.getByRole('button', { name: '播放读音' }).isVisible()
+await interactionPage.getByRole('button', { name: '你好', exact: true }).click()
+await interactionPage.getByRole('button', { name: '检查答案' }).click()
+const sentenceAudioVisible = await interactionPage.getByRole('button', { name: '播放例句：Hello, nice to meet you.' }).isVisible()
+await interactionPage.screenshot({ path: 'artifacts/audio-lesson-desktop.png', fullPage: true })
+results.push({ interaction: 'word-and-sentence-audio', wordAudioVisible, sentenceAudioVisible })
+await interactionPage.getByRole('button', { name: '关闭课程' }).click()
 await interactionPage.close()
 
 const registrationPage = await browser.newPage({ viewport: { width: 1280, height: 900 } })

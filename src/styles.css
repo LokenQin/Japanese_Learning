@@ -253,13 +253,22 @@ h3 { font-size: 16px; line-height: 1.4; letter-spacing: 0; }
 .review-queue button > strong { font-family: 'Yu Mincho', 'MS Mincho', serif; font-size: 14px; font-weight: 500; }
 .review-queue button > i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--green); }
 .flashcard-area { display: flex; align-items: center; flex-direction: column; padding: 42px; }
-.flashcard { width: min(100%, 480px); height: 330px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 26px; padding: 25px; background: #fffefb; border: 1px solid #d6d4cb; border-radius: 7px; box-shadow: 0 10px 25px rgba(37,37,33,.06); cursor: pointer; }
-.flashcard-symbol { font-family: 'Yu Mincho', 'MS Mincho', serif; font-size: 88px; line-height: 1; }
+.flashcard { width: min(100%, 480px); height: 390px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px; padding: 25px; background: #fffefb; border: 1px solid #d6d4cb; border-radius: 7px; box-shadow: 0 10px 25px rgba(37,37,33,.06); }
+.flashcard-symbol { max-width: 100%; overflow-wrap: anywhere; font-family: 'Yu Mincho', 'MS Mincho', serif; font-size: 88px; line-height: 1.1; text-align: center; }
+.flashcard-symbol.flashcard-symbol-text { font-size: 44px; }
 .reveal-hint { color: var(--muted); font-size: 11px; }
 .flashcard-answer { display: flex; flex-direction: column; text-align: center; }
 .flashcard-answer strong { color: var(--red); font-size: 20px; }
-.flashcard-answer span { margin-top: 5px; font-size: 15px; }
-.flashcard-answer small { margin-top: 9px; color: var(--muted); font-size: 11px; }
+.flashcard-answer > span { margin-top: 5px; font-size: 15px; }
+.flashcard-answer > small { margin-top: 7px; color: var(--muted); font-size: 11px; }
+.audio-button { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; color: var(--red-dark); background: var(--red-soft); border: 1px solid #ebcbc7; border-radius: 5px; cursor: pointer; font-size: 10px; font-weight: 600; }
+.audio-button:hover { color: #fff; background: var(--red); border-color: var(--red); }
+.audio-button:disabled { opacity: .45; cursor: not-allowed; }
+.flashcard-audio { flex: 0 0 auto; }
+.example-line { min-width: min(380px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); text-align: left; }
+.example-line > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.example-line b { overflow-wrap: anywhere; font-size: 12px; }
+.example-line small { color: var(--muted); font-size: 10px; }
 .reveal-button { margin-top: 22px; }
 .rating-row { width: min(100%, 580px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 22px; }
 .rating-row button { min-height: 54px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
@@ -350,6 +359,10 @@ h3 { font-size: 16px; line-height: 1.4; letter-spacing: 0; }
 .quiz-feedback.error { color: var(--red-dark); background: var(--red-soft); }
 .quiz-feedback strong { font-size: 12px; }
 .quiz-feedback span { margin-top: 2px; font-size: 10px; }
+.quiz-example { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(93,119,89,.2); }
+.quiz-example > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.quiz-example b { overflow-wrap: anywhere; font-size: 11px; }
+.quiz-example small { color: inherit; font-size: 9px; opacity: .78; }
 .lesson-result { justify-content: center; gap: 14px; }
 .result-badge { width: 66px; height: 66px; display: grid; place-items: center; border-radius: 50%; margin-bottom: 4px; }
 .result-badge.success { color: var(--green); background: var(--green-soft); border: 1.5px solid var(--green); }
@@ -440,8 +453,10 @@ h3 { font-size: 16px; line-height: 1.4; letter-spacing: 0; }
   .review-queue button { flex: 0 0 56px; display: flex; justify-content: center; min-height: 42px; }
   .review-queue button > span, .review-queue button > i { display: none; }
   .flashcard-area { padding: 28px 14px 24px; }
-  .flashcard { height: 280px; }
+  .flashcard { height: 370px; padding: 20px 16px; }
   .flashcard-symbol { font-size: 70px; }
+  .flashcard-symbol.flashcard-symbol-text { font-size: 34px; }
+  .example-line { min-width: 100%; }
   .rating-row { grid-template-columns: repeat(2, 1fr); }
   .metric-strip { grid-template-columns: 1fr 1fr; }
   .metric-strip > div { min-height: 96px; padding: 15px; }

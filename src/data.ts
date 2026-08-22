@@ -1,7 +1,7 @@
 import type { AppState, CardGroup, LanguageCode, ReviewCard } from './types'
 
 export interface FoundationEntry { symbol: string; reading: string; row: string; hint: string }
-export interface VocabEntry { word: string; reading: string; meaning: string; hint: string }
+export interface VocabEntry { word: string; reading: string; meaning: string; hint: string; example: string; exampleMeaning: string }
 export interface Course { id: string; index: string; title: string; subtitle: string; description: string; lessons: number; duration: string }
 export interface LanguagePack {
   code: LanguageCode; name: string; nativeName: string; locale: string; brandMark: string; greeting: string
@@ -24,12 +24,17 @@ const japaneseFoundation: FoundationEntry[] = [
 ].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}平假名，读作 ${reading}` }))
 
 const japaneseVocab: VocabEntry[] = [
-  ['おはよう', 'ohayou', '早上好', '早晨见面时使用'], ['こんにちは', 'konnichiwa', '你好', '白天见面时使用'],
-  ['こんばんは', 'konbanwa', '晚上好', '傍晚见面时使用'], ['ありがとう', 'arigatou', '谢谢', '表达感谢'],
-  ['すみません', 'sumimasen', '不好意思 / 劳驾', '道歉或搭话前使用'], ['さようなら', 'sayounara', '再见', '较长时间的道别'],
-  ['はじめまして', 'hajimemashite', '初次见面', '第一次见面时使用'], ['おやすみ', 'oyasumi', '晚安', '睡前道别'],
-  ['はい', 'hai', '是 / 好的', '肯定回答'], ['いいえ', 'iie', '不 / 不是', '否定回答'],
-].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+  ['おはよう', 'ohayou', '早上好', '早晨见面时使用', 'おはようございます。', '早上好。'],
+  ['こんにちは', 'konnichiwa', '你好', '白天见面时使用', 'こんにちは、田中さん。', '你好，田中先生。'],
+  ['こんばんは', 'konbanwa', '晚上好', '傍晚见面时使用', 'こんばんは、元気ですか。', '晚上好，你好吗？'],
+  ['ありがとう', 'arigatou', '谢谢', '表达感谢', 'ありがとうございます。', '非常感谢。'],
+  ['すみません', 'sumimasen', '不好意思 / 劳驾', '道歉或搭话前使用', 'すみません、駅はどこですか。', '劳驾，请问车站在哪里？'],
+  ['さようなら', 'sayounara', '再见', '较长时间的道别', 'さようなら、また会いましょう。', '再见，下次再会。'],
+  ['はじめまして', 'hajimemashite', '初次见面', '第一次见面时使用', 'はじめまして、李です。', '初次见面，我姓李。'],
+  ['おやすみ', 'oyasumi', '晚安', '睡前道别', 'おやすみなさい。', '晚安。'],
+  ['はい', 'hai', '是 / 好的', '肯定回答', 'はい、わかりました。', '好的，我明白了。'],
+  ['いいえ', 'iie', '不 / 不是', '否定回答', 'いいえ、違います。', '不，不是这样。'],
+].map(([word, reading, meaning, hint, example, exampleMeaning]) => ({ word, reading, meaning, hint, example, exampleMeaning }))
 
 const englishFoundation: FoundationEntry[] = [
   ['A', 'eɪ', '元音'], ['E', 'iː', '元音'], ['I', 'aɪ', '元音'], ['O', 'oʊ', '元音'], ['U', 'juː', '元音'],
@@ -37,11 +42,17 @@ const englishFoundation: FoundationEntry[] = [
 ].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}发音，留意口型与舌位` }))
 
 const englishVocab: VocabEntry[] = [
-  ['hello', 'həˈloʊ', '你好', '通用问候'], ['morning', 'ˈmɔːrnɪŋ', '早晨', 'Good morning 的核心词'],
-  ['thanks', 'θæŋks', '谢谢', '日常感谢'], ['please', 'pliːz', '请', '礼貌请求'], ['sorry', 'ˈsɑːri', '对不起', '表达歉意'],
-  ['welcome', 'ˈwelkəm', '欢迎', '欢迎对方'], ['yes', 'jes', '是', '肯定回答'], ['no', 'noʊ', '不', '否定回答'],
-  ['goodbye', 'ˌɡʊdˈbaɪ', '再见', '告别用语'], ['friend', 'frend', '朋友', '介绍人际关系'],
-].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+  ['hello', 'həˈloʊ', '你好', '通用问候', 'Hello, nice to meet you.', '你好，很高兴认识你。'],
+  ['morning', 'ˈmɔːrnɪŋ', '早晨', 'Good morning 的核心词', 'Good morning, everyone.', '大家早上好。'],
+  ['thanks', 'θæŋks', '谢谢', '日常感谢', 'Thanks for your help.', '谢谢你的帮助。'],
+  ['please', 'pliːz', '请', '礼貌请求', 'Please sit down.', '请坐。'],
+  ['sorry', 'ˈsɑːri', '对不起', '表达歉意', 'I am sorry I am late.', '对不起，我迟到了。'],
+  ['welcome', 'ˈwelkəm', '欢迎', '欢迎对方', 'Welcome to our class.', '欢迎来到我们的课堂。'],
+  ['yes', 'jes', '是', '肯定回答', 'Yes, I understand.', '是的，我明白了。'],
+  ['no', 'noʊ', '不', '否定回答', 'No, thank you.', '不用了，谢谢。'],
+  ['goodbye', 'ˌɡʊdˈbaɪ', '再见', '告别用语', 'Goodbye, see you tomorrow.', '再见，明天见。'],
+  ['friend', 'frend', '朋友', '介绍人际关系', 'She is my best friend.', '她是我最好的朋友。'],
+].map(([word, reading, meaning, hint, example, exampleMeaning]) => ({ word, reading, meaning, hint, example, exampleMeaning }))
 
 const spanishFoundation: FoundationEntry[] = [
   ['A', 'a', '元音'], ['E', 'e', '元音'], ['I', 'i', '元音'], ['O', 'o', '元音'], ['U', 'u', '元音'],
@@ -49,16 +60,22 @@ const spanishFoundation: FoundationEntry[] = [
 ].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}，注意西班牙语的稳定发音规则` }))
 
 const spanishVocab: VocabEntry[] = [
-  ['hola', 'o-la', '你好', '通用问候'], ['buenos días', 'bwe-nos di-as', '早上好', '上午问候'], ['gracias', 'gra-sias', '谢谢', '表达感谢'],
-  ['por favor', 'por fa-bor', '请', '礼貌请求'], ['perdón', 'per-don', '对不起', '表达歉意'], ['bienvenido', 'byen-be-ni-do', '欢迎', '欢迎对方'],
-  ['sí', 'si', '是', '肯定回答'], ['no', 'no', '不', '否定回答'], ['adiós', 'a-dios', '再见', '告别用语'],
-  ['amigo', 'a-mi-go', '朋友', '男性朋友；女性用 amiga'],
-].map(([word, reading, meaning, hint]) => ({ word, reading, meaning, hint }))
+  ['hola', 'o-la', '你好', '通用问候', 'Hola, mucho gusto.', '你好，很高兴认识你。'],
+  ['buenos días', 'bwe-nos di-as', '早上好', '上午问候', 'Buenos días, ¿cómo estás?', '早上好，你好吗？'],
+  ['gracias', 'gra-sias', '谢谢', '表达感谢', 'Muchas gracias por tu ayuda.', '非常感谢你的帮助。'],
+  ['por favor', 'por fa-bor', '请', '礼貌请求', 'Un café, por favor.', '请给我一杯咖啡。'],
+  ['perdón', 'per-don', '对不起', '表达歉意', 'Perdón por llegar tarde.', '对不起，我迟到了。'],
+  ['bienvenido', 'byen-be-ni-do', '欢迎', '欢迎对方', 'Bienvenido a nuestra clase.', '欢迎来到我们的课堂。'],
+  ['sí', 'si', '是', '肯定回答', 'Sí, entiendo.', '是的，我明白。'],
+  ['no', 'no', '不', '否定回答', 'No, gracias.', '不用了，谢谢。'],
+  ['adiós', 'a-dios', '再见', '告别用语', 'Adiós, hasta mañana.', '再见，明天见。'],
+  ['amigo', 'a-mi-go', '朋友', '男性朋友；女性用 amiga', 'Carlos es mi amigo.', '卡洛斯是我的朋友。'],
+].map(([word, reading, meaning, hint, example, exampleMeaning]) => ({ word, reading, meaning, hint, example, exampleMeaning }))
 
 function cards(code: LanguageCode, foundation: FoundationEntry[], vocab: VocabEntry[]): ReviewCard[] {
   return [
-    ...foundation.map((entry) => ({ id: `${code}-kana-${entry.symbol}`, prompt: entry.symbol, reading: entry.reading, answer: entry.row, hint: entry.hint, group: 'kana' as CardGroup })),
-    ...vocab.map((entry) => ({ id: `${code}-vocab-${entry.word}`, prompt: entry.word, reading: entry.reading, answer: entry.meaning, hint: entry.hint, group: 'vocab' as CardGroup })),
+    ...foundation.map((entry) => ({ id: `${code}-kana-${entry.symbol}`, prompt: entry.symbol, reading: entry.reading, answer: entry.row, hint: entry.hint, group: 'kana' as CardGroup, speakText: entry.symbol })),
+    ...vocab.map((entry) => ({ id: `${code}-vocab-${entry.word}`, prompt: entry.word, reading: entry.reading, answer: entry.meaning, hint: entry.hint, group: 'vocab' as CardGroup, speakText: entry.word, example: entry.example, exampleMeaning: entry.exampleMeaning })),
   ]
 }
 

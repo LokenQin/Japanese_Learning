@@ -79,6 +79,38 @@ function formatISODate(iso: string): string {
   return `${date.getMonth() + 1} 月 ${date.getDate()} 日`
 }
 
+function playSpeech(text: string, locale: string) {
+  if (!text || !('speechSynthesis' in window)) return
+  const synthesis = window.speechSynthesis
+  const utterance = new SpeechSynthesisUtterance(text)
+  const language = locale.toLowerCase()
+  const voices = synthesis.getVoices()
+  utterance.voice = voices.find((voice) => voice.lang.toLowerCase() === language)
+    ?? voices.find((voice) => voice.lang.toLowerCase().startsWith(language.split('-')[0]))
+    ?? null
+  utterance.lang = locale
+  utterance.rate = 0.78
+  synthesis.cancel()
+  synthesis.speak(utterance)
+}
+
+function AudioButton({ text, locale, label = '播放发音', className = '' }: { text: string; locale: string; label?: string; className?: string }) {
+  const supported = 'speechSynthesis' in window
+  return (
+    <button
+      type="button"
+      className={`audio-button ${className}`}
+      onClick={(event) => { event.stopPropagation(); playSpeech(text, locale) }}
+      aria-label={`${label}：${text}`}
+      title={supported ? label : '当前浏览器不支持语音播放'}
+      disabled={!supported}
+    >
+      <Volume2 size={17} />
+      <span>{label}</span>
+    </button>
+  )
+}
+
 function App() {
   const auth = useAuth()
 
@@ -700,14 +732,23 @@ function ReviewPage({
             {current.group === 'kana' ? pack.foundationPrompt : pack.vocabularyPrompt}
             {!currentProgress && <span className="new-card-chip">新卡片</span>}
           </p>
-          <button className="flashcard" onClick={() => setRevealed(true)}>
-            <span className="flashcard-symbol">{current.prompt}</span>
+          <div className="flashcard">
+            <span className={`flashcard-symbol ${current.prompt.length > 2 ? 'flashcard-symbol-text' : ''}`}>{current.prompt}</span>
+            <AudioButton text={current.speakText} locale={pack.locale} label={current.group === 'kana' ? '播放读音' : '播放单词'} className="flashcard-audio" />
             {revealed ? (
-              <span className="flashcard-answer"><strong>{current.reading}</strong><span>{current.answer}</span><small>{current.hint}</small></span>
+              <span className="flashcard-answer">
+                <strong>{current.reading}</strong><span>{current.answer}</span><small>{current.hint}</small>
+                {current.example && (
+                  <span className="example-line">
+                    <span><b>{current.example}</b><small>{current.exampleMeaning}</small></span>
+                    <AudioButton text={current.example} locale={pack.locale} label="播放例句" />
+                  </span>
+                )}
+              </span>
             ) : (
               <span className="reveal-hint">点击查看答案</span>
             )}
-          </button>
+          </div>
           {revealed ? (
             <div className="rating-row">
               {(['again', 'hard', 'good', 'easy'] as Rating[]).map((rating) => (
@@ -876,6 +917,8 @@ interface LessonQuestion {
   speakText: string
   options: string[]
   answer: string
+  example?: string
+  exampleMeaning?: string
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -905,6 +948,8 @@ function buildQuestions(pack: LanguagePack, kind: TaskKind, cardProgress: AppSta
       speakText: entry.word,
       options: shuffle([entry.meaning, ...pickDistractors(meanings, entry.meaning, 2)]),
       answer: entry.meaning,
+      example: entry.example,
+      exampleMeaning: entry.exampleMeaning,
     }))
   }
 
@@ -963,12 +1008,7 @@ function LessonModal({
   const strictPassed = !strictMode || accuracy >= 80
 
   const speak = useCallback((text: string) => {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = pack.locale
-    utterance.rate = 0.7
-    window.speechSynthesis.speak(utterance)
+    playSpeech(text, pack.locale)
   }, [pack.locale])
 
   useEffect(() => {
@@ -1039,7 +1079,18 @@ function LessonModal({
                 </button>
               ))}
             </div>
-            {checked && <div className={`quiz-feedback ${isCorrect ? 'success' : 'error'}`}><strong>{isCorrect ? '回答正确' : '再想一想'}</strong><span>{isCorrect ? `「${question.prompt || question.speakText}」→ ${question.answer}` : '可以先听一遍读音，然后重新选择。'}</span></div>}
+            {checked && (
+              <div className={`quiz-feedback ${isCorrect ? 'success' : 'error'}`}>
+                <strong>{isCorrect ? '回答正确' : '再想一想'}</strong>
+                <span>{isCorrect ? `「${question.prompt || question.speakText}」→ ${question.answer}` : '可以先听一遍读音，然后重新选择。'}</span>
+                {isCorrect && question.example && (
+                  <div className="quiz-example">
+                    <span><b>{question.example}</b><small>{question.exampleMeaning}</small></span>
+                    <AudioButton text={question.example} locale={pack.locale} label="播放例句" />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <footer>
