@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  ArrowLeft,
+  ArrowLeftRight,
   BarChart3,
   Bell,
   BookOpen,
@@ -10,15 +12,20 @@ import {
   Clock3,
   Cloud,
   CloudOff,
+  CircleCheck,
+  Coins,
   Flame,
+  Gift,
   Headphones,
   Home,
   Languages,
+  KeyRound,
   LockKeyhole,
   LogIn,
   LogOut,
   LoaderCircle,
   Menu,
+  Palette,
   RotateCcw,
   Settings,
   Sparkles,
@@ -27,8 +34,9 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { resetPassword, updateRecoveryKeyword } from './api'
 import { courseProgress, getLanguagePack, languageOptions, totalLessons } from './data'
-import type { LanguagePack } from './data'
+import type { KanaPair, LanguagePack } from './data'
 import {
   groupMastery,
   intervalLabel,
@@ -39,11 +47,13 @@ import {
   quizAccuracy,
   reviewQueueToday,
   streakOf,
+  todayISO,
   weekMinutes,
   weekRangeLabel,
   weekTotalMinutes,
 } from './srs'
-import type { AppState, DailyTask, LanguageCode, Page, QuizStat, Rating, ReviewCard, TaskKind } from './types'
+import { DAILY_REWARD_POINTS, themeCatalog } from './themes'
+import type { AppState, DailyTask, LanguageCode, Page, QuizStat, Rating, ReviewCard, RewardsState, TaskKind, ThemeId } from './types'
 import { useAuth } from './useAuth'
 import { useLearningState } from './useLearningState'
 import type { SyncStatus } from './useLearningState'
@@ -66,8 +76,8 @@ const taskIcons: Record<TaskKind, LucideIcon> = {
 const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六']
 
 const studyImage = window.location.protocol === 'file:'
-  ? './public/images/japanese-study-desk.png'
-  : '/images/japanese-study-desk.png'
+  ? './public/images/japanese-study-desk.jpg'
+  : '/images/japanese-study-desk.jpg'
 
 function formatToday(): string {
   const now = new Date()
@@ -131,8 +141,9 @@ function App() {
 function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLogout: () => Promise<void> }) {
   const [page, setPage] = useState<Page>('today')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [lessonTask, setLessonTask] = useState<DailyTask | null>(null)
-  const { state, activeLanguage, loaded, syncStatus, syncError, switchLanguage, toggleTask, rateCard, recordQuiz, completeLesson, updateSetting } = useLearningState()
+  const { state, rewards, activeLanguage, loaded, syncStatus, syncError, switchLanguage, toggleTask, rateCard, recordQuiz, completeLesson, updateSetting, claimCheckIn, selectTheme, retrySync } = useLearningState()
   const pack = getLanguagePack(activeLanguage)
 
   if (!loaded && syncStatus !== 'error') return <AppLoading label="正在同步学习数据" />
@@ -142,10 +153,13 @@ function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLo
 
   const streak = streakOf(state.studyLog)
   const reviewQueue = reviewQueueToday(pack.reviewCards, state.cardProgress)
+  const pendingTaskCount = state.tasks.filter((task) => !task.completed).length
+  const checkedInToday = rewards.checkInDates.includes(todayISO())
 
   const navigate = (target: Page) => {
     setPage(target)
     setMobileNavOpen(false)
+    setNotificationsOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -182,7 +196,21 @@ function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLo
         onLogout={onLogout}
       />
       <main className="main-area">
-        <Topbar page={page} streak={streak} syncStatus={syncStatus} syncError={syncError} onMenu={() => setMobileNavOpen(true)} />
+        <Topbar
+          page={page}
+          streak={streak}
+          points={rewards.points}
+          pendingTaskCount={pendingTaskCount}
+          reviewCount={reviewQueue.length}
+          checkedInToday={checkedInToday}
+          notificationsOpen={notificationsOpen}
+          syncStatus={syncStatus}
+          syncError={syncError}
+          onMenu={() => setMobileNavOpen(true)}
+          onToggleNotifications={() => setNotificationsOpen((open) => !open)}
+          onNavigate={navigate}
+          onRetrySync={retrySync}
+        />
         <div className="page-container">
           {page === 'today' && (
             <TodayPage
@@ -194,6 +222,8 @@ function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLo
               onNavigate={navigate}
               displayName={displayName}
               pack={pack}
+              rewards={rewards}
+              onClaimCheckIn={claimCheckIn}
             />
           )}
           {page === 'learn' && <LearnPage pack={pack} lessonsCompleted={state.lessonsCompleted} onStart={startNextTask} />}
@@ -201,7 +231,7 @@ function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLo
             <ReviewPage key={activeLanguage} pack={pack} cardProgress={state.cardProgress} onRate={rateCard} onQueueCleared={completeReviewQueue} />
           )}
           {page === 'insights' && <InsightsPage pack={pack} state={state} />}
-          {page === 'settings' && <SettingsPage pack={pack} activeLanguage={activeLanguage} onLanguageChange={switchLanguage} state={state} updateSetting={updateSetting} />}
+          {page === 'settings' && <SettingsPage pack={pack} activeLanguage={activeLanguage} onLanguageChange={switchLanguage} state={state} rewards={rewards} updateSetting={updateSetting} onSelectTheme={selectTheme} />}
         </div>
       </main>
       <MobileNav page={page} onNavigate={navigate} />
@@ -209,6 +239,7 @@ function AuthenticatedApp({ displayName, onLogout }: { displayName: string; onLo
         <LessonModal
           task={lessonTask}
           cardProgress={state.cardProgress}
+          lessonSequence={state.lessonsCompleted}
           soundEnabled={state.soundEnabled}
           strictMode={state.strictMode}
           pack={pack}
@@ -310,9 +341,57 @@ function Sidebar({
   )
 }
 
-function Topbar({ page, streak, syncStatus, syncError, onMenu }: { page: Page; streak: number; syncStatus: SyncStatus; syncError: string; onMenu: () => void }) {
+function Topbar({
+  page,
+  streak,
+  points,
+  pendingTaskCount,
+  reviewCount,
+  checkedInToday,
+  notificationsOpen,
+  syncStatus,
+  syncError,
+  onMenu,
+  onToggleNotifications,
+  onNavigate,
+  onRetrySync,
+}: {
+  page: Page
+  streak: number
+  points: number
+  pendingTaskCount: number
+  reviewCount: number
+  checkedInToday: boolean
+  notificationsOpen: boolean
+  syncStatus: SyncStatus
+  syncError: string
+  onMenu: () => void
+  onToggleNotifications: () => void
+  onNavigate: (page: Page) => void
+  onRetrySync: () => void
+}) {
   const title = navItems.find((item) => item.id === page)?.label ?? ''
   const syncing = syncStatus === 'loading' || syncStatus === 'saving'
+  const notificationAreaRef = useRef<HTMLDivElement>(null)
+  const checkInReady = pendingTaskCount === 0 && !checkedInToday
+  const hasPendingNotice = pendingTaskCount > 0 || reviewCount > 0 || checkInReady
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!notificationAreaRef.current?.contains(event.target as Node)) onToggleNotifications()
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onToggleNotifications()
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [notificationsOpen, onToggleNotifications])
+
   return (
     <header className="topbar">
       <button className="icon-button menu-button" onClick={onMenu} aria-label="打开导航">
@@ -320,15 +399,45 @@ function Topbar({ page, streak, syncStatus, syncError, onMenu }: { page: Page; s
       </button>
       <span className="mobile-page-title">{title}</span>
       <div className="topbar-spacer" />
-      <div className={`cloud-status ${syncStatus === 'error' ? 'cloud-error' : ''}`} title={syncError || (syncing ? '正在同步云端数据' : '数据已同步至云端')}>
-        {syncStatus === 'error' ? <CloudOff size={16} /> : syncing ? <LoaderCircle className="spin" size={16} /> : <Cloud size={16} />}
-        <span>{syncStatus === 'error' ? '同步失败' : syncing ? '同步中' : '已同步'}</span>
-      </div>
+      {syncStatus === 'error' ? (
+        <button className="cloud-status cloud-error" type="button" title={`${syncError || '同步失败'}，点击重试`} onClick={onRetrySync}>
+          <CloudOff size={16} /><span>重试同步</span>
+        </button>
+      ) : (
+        <div className="cloud-status" title={syncing ? '正在同步云端数据' : '数据已同步至云端'}>
+          {syncing ? <LoaderCircle className="spin" size={16} /> : <Cloud size={16} />}
+          <span>{syncing ? '同步中' : '已同步'}</span>
+        </div>
+      )}
+      <div className="points-chip" title="可用于兑换主题的积分"><Coins size={16} /><strong>{points}</strong></div>
       <div className="status-chip"><Flame size={17} fill="currentColor" /> {streak} 天</div>
-      <button className="icon-button notification-button" aria-label="通知">
-        <Bell size={20} />
-        <i />
-      </button>
+      <div className="notification-area" ref={notificationAreaRef}>
+        <button className="icon-button notification-button" type="button" aria-label="学习提醒" aria-expanded={notificationsOpen} aria-controls="learning-notifications" onClick={onToggleNotifications}>
+          <Bell size={20} />
+          {hasPendingNotice && <i />}
+        </button>
+        {notificationsOpen && (
+          <div className="notification-panel" id="learning-notifications" role="dialog" aria-label="学习提醒">
+            <div className="notification-heading"><strong>学习提醒</strong><span>{hasPendingNotice ? '还有进度待完成' : '今日已完成'}</span></div>
+            {pendingTaskCount > 0 && (
+              <button type="button" onClick={() => onNavigate('today')}>
+                <Target size={17} /><span><strong>今日任务</strong><small>还有 {pendingTaskCount} 项未完成</small></span><ChevronRight size={16} />
+              </button>
+            )}
+            {reviewCount > 0 && (
+              <button type="button" onClick={() => onNavigate('review')}>
+                <RotateCcw size={17} /><span><strong>到期复习</strong><small>{reviewCount} 张记忆卡待复习</small></span><ChevronRight size={16} />
+              </button>
+            )}
+            {checkInReady && (
+              <button type="button" onClick={() => onNavigate('today')}>
+                <Gift size={17} /><span><strong>可以打卡</strong><small>领取 {DAILY_REWARD_POINTS} 积分</small></span><ChevronRight size={16} />
+              </button>
+            )}
+            {!hasPendingNotice && <p><CircleCheck size={18} /> 今天的学习安排已全部处理。</p>}
+          </div>
+        )}
+      </div>
     </header>
   )
 }
@@ -359,36 +468,96 @@ function LoginPage({
   onRegister,
 }: {
   onLogin: (email: string, password: string) => Promise<void>
-  onRegister: (displayName: string, email: string, password: string) => Promise<void>
+  onRegister: (displayName: string, email: string, password: string, recoveryKeyword: string) => Promise<void>
 }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  type AuthMode = 'login' | 'register' | 'forgot'
+  const [mode, setMode] = useState<AuthMode>('login')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
+  const [recoveryKeyword, setRecoveryKeyword] = useState('')
+  const [confirmRecoveryKeyword, setConfirmRecoveryKeyword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const changeMode = (nextMode: AuthMode) => {
+    setMode(nextMode)
+    setError('')
+    setMessage('')
+    setPassword('')
+    setConfirmPassword('')
+    setRecoveryKeyword('')
+    setConfirmRecoveryKeyword('')
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setSubmitting(true)
     setError('')
+    setMessage('')
     try {
       if (mode === 'register') {
         if (password !== confirmPassword) {
           setError('两次输入的密码不一致')
           return
         }
-        await onRegister(displayName, email, password)
-      } else {
+        if (recoveryKeyword !== confirmRecoveryKeyword) {
+          setError('两次输入的找回关键字不一致')
+          return
+        }
+        await onRegister(displayName, email, password, recoveryKeyword)
+      } else if (mode === 'login') {
         await onLogin(email, password)
+      } else {
+        if (password !== confirmPassword) {
+          setError('两次输入的密码不一致')
+          return
+        }
+        const result = await resetPassword(email, recoveryKeyword, password)
+        setMode('login')
+        setPassword('')
+        setConfirmPassword('')
+        setRecoveryKeyword('')
+        setConfirmRecoveryKeyword('')
+        setMessage(result.message)
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : mode === 'login' ? '登录失败' : '注册失败')
+      setError(requestError instanceof Error ? requestError.message : '请求失败，请稍后再试')
     } finally {
       setSubmitting(false)
     }
   }
+
+  const content = {
+    login: {
+      eyebrow: 'WELCOME BACK',
+      title: '继续今天的学习',
+      intro: '登录后，学习记录会在云端安全保存并跨设备同步。',
+      action: '登录',
+      busy: '正在登录',
+      help: '使用已注册邮箱继续学习。',
+    },
+    register: {
+      eyebrow: 'CREATE ACCOUNT',
+      title: '开始你的语言学习',
+      intro: '使用邮箱创建账户，学习记录会独立保存在云端。',
+      action: '创建账户',
+      busy: '正在创建账户',
+      help: '密码和找回关键字仅保存为不可逆哈希，请妥善记住关键字。',
+    },
+    forgot: {
+      eyebrow: 'PASSWORD RECOVERY',
+      title: '找回登录密码',
+      intro: '验证注册时预留的关键字后设置新密码，旧登录状态将自动失效。',
+      action: '重置密码',
+      busy: '正在更新',
+      help: '原密码和找回关键字都不会被展示；连续失败会触发访问限制。',
+    },
+  }[mode]
+
+  const ActionIcon = mode === 'forgot' ? KeyRound : LogIn
 
   return (
     <main className="login-page">
@@ -403,13 +572,19 @@ function LoginPage({
       <section className="login-panel">
         <div className="login-form-wrap">
           <div className="gate-brand"><span>こ</span><strong>ことば</strong></div>
-          <div className="auth-tabs" role="tablist" aria-label="账户操作">
-            <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError('') }}>登录</button>
-            <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setError('') }}>注册</button>
-          </div>
-          <p className="eyebrow">{mode === 'login' ? 'WELCOME BACK' : 'CREATE ACCOUNT'}</p>
-          <h1>{mode === 'login' ? '继续今天的学习' : '开始你的语言学习'}</h1>
-          <p className="login-intro">{mode === 'login' ? '登录后，学习记录会在云端安全保存并跨设备同步。' : '创建账户后，你的任务、复习记录和设置都会独立保存。'}</p>
+          {mode === 'login' || mode === 'register' ? (
+            <div className="auth-tabs" role="tablist" aria-label="账户操作">
+              <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>登录</button>
+              <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} onClick={() => changeMode('register')}>注册</button>
+            </div>
+          ) : (
+            <button type="button" className="auth-back-button" onClick={() => changeMode('login')}>
+              <ArrowLeft size={16} />返回登录
+            </button>
+          )}
+          <p className="eyebrow">{content.eyebrow}</p>
+          <h1>{content.title}</h1>
+          <p className="login-intro">{content.intro}</p>
           <form onSubmit={submit}>
             {mode === 'register' && (
               <label>
@@ -421,23 +596,45 @@ function LoginPage({
               <span>邮箱</span>
               <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
             </label>
+            {mode === 'forgot' && (
+              <label>
+                <span>预留关键字</span>
+                <input type="password" autoComplete="off" value={recoveryKeyword} onChange={(event) => setRecoveryKeyword(event.target.value)} placeholder="输入注册时设置的关键字" minLength={6} maxLength={64} required />
+              </label>
+            )}
             <label>
-              <span>密码</span>
-              <input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === 'login' ? '输入登录密码' : '至少 10 位字符'} minLength={mode === 'register' ? 10 : undefined} maxLength={128} required />
+              <span>{mode === 'forgot' ? '新密码' : '密码'}</span>
+              <input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === 'login' ? '输入登录密码' : '至少 10 位字符'} minLength={mode === 'login' ? undefined : 10} maxLength={128} required />
             </label>
-            {mode === 'register' && (
+            {(mode === 'register' || mode === 'forgot') && (
               <label>
                 <span>确认密码</span>
                 <input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="再次输入密码" minLength={10} maxLength={128} required />
               </label>
             )}
+            {mode === 'register' && (
+              <>
+                <label>
+                  <span>找回关键字</span>
+                  <input type="password" autoComplete="off" value={recoveryKeyword} onChange={(event) => setRecoveryKeyword(event.target.value)} placeholder="6 至 64 位私密短语" minLength={6} maxLength={64} required />
+                </label>
+                <label>
+                  <span>确认找回关键字</span>
+                  <input type="password" autoComplete="off" value={confirmRecoveryKeyword} onChange={(event) => setConfirmRecoveryKeyword(event.target.value)} placeholder="再次输入找回关键字" minLength={6} maxLength={64} required />
+                </label>
+              </>
+            )}
+            {mode === 'login' && (
+              <button type="button" className="forgot-password-button" onClick={() => changeMode('forgot')}>忘记密码？</button>
+            )}
             {error && <div className="login-error" role="alert">{error}</div>}
+            {message && <div className="login-success" role="status"><CircleCheck size={16} />{message}</div>}
             <button className="primary-button login-button" type="submit" disabled={submitting}>
-              {submitting ? <LoaderCircle className="spin" size={18} /> : <LogIn size={18} />}
-              {submitting ? (mode === 'login' ? '正在登录' : '正在创建账户') : (mode === 'login' ? '登录' : '创建账户')}
+              {submitting ? <LoaderCircle className="spin" size={18} /> : <ActionIcon size={18} />}
+              {submitting ? content.busy : content.action}
             </button>
           </form>
-          <p className="login-help">{mode === 'login' ? '使用已注册邮箱继续学习。' : '密码仅保存为不可逆哈希，不会以明文写入数据库。'}</p>
+          <p className="login-help">{content.help}</p>
         </div>
       </section>
     </main>
@@ -453,6 +650,8 @@ function TodayPage({
   onNavigate,
   displayName,
   pack,
+  rewards,
+  onClaimCheckIn,
 }: {
   state: AppState
   streak: number
@@ -462,6 +661,8 @@ function TodayPage({
   onNavigate: (page: Page) => void
   displayName: string
   pack: LanguagePack
+  rewards: RewardsState
+  onClaimCheckIn: () => void
 }) {
   const completed = state.tasks.filter((task) => task.completed).length
   const progress = Math.round((completed / state.tasks.length) * 100)
@@ -474,6 +675,10 @@ function TodayPage({
   const reviewKanaCount = reviewQueueToday(pack.reviewCards, state.cardProgress)
     .filter((entry) => entry.card.group === 'kana').length
   const reviewVocabCount = reviewQueueLength - reviewKanaCount
+  const today = todayISO()
+  const tasksAreCurrent = state.taskDate === today
+  const allTasksCompleted = tasksAreCurrent && completed === state.tasks.length
+  const checkedInToday = rewards.checkInDates.includes(today)
 
   return (
     <div className="page-stack">
@@ -546,6 +751,19 @@ function TodayPage({
         </aside>
       </section>
 
+      <section className={`checkin-band ${checkedInToday ? 'checkin-complete' : ''}`}>
+        <div className="checkin-symbol">{checkedInToday ? <Check size={24} /> : <Gift size={24} />}</div>
+        <div className="checkin-copy">
+          <p className="eyebrow">DAILY CHECK-IN</p>
+          <h3>{checkedInToday ? '今日打卡完成' : `完成计划，领取 ${DAILY_REWARD_POINTS} 积分`}</h3>
+          <p>{checkedInToday ? `累计打卡 ${rewards.checkInDates.length} 天，积分已存入账户。` : !tasksAreCurrent ? '日期已变化，刷新页面后开始今天的计划。' : allTasksCompleted ? '今天的任务已全部完成，现在可以领取奖励。' : `还需完成 ${state.tasks.length - completed} 项任务，积分可用于兑换主题。`}</p>
+        </div>
+        <div className="checkin-balance"><Coins size={16} /><span>积分余额</span><strong>{rewards.points}</strong></div>
+        <button className="primary-button" onClick={onClaimCheckIn} disabled={!allTasksCompleted || checkedInToday}>
+          {checkedInToday ? '今日已领取' : `领取 +${DAILY_REWARD_POINTS}`}
+        </button>
+      </section>
+
       <section className="review-band">
         <div className="review-symbol">復</div>
         <div className="review-copy">
@@ -611,10 +829,12 @@ function LearnPage({ pack, lessonsCompleted, onStart }: { pack: LanguagePack; le
           </div>
         </div>
         <div className="kana-preview" aria-label={`${pack.foundationLabel}预览`}>
-          {pack.preview.map(([symbol, reading]) => <div key={symbol}><strong>{symbol}</strong><span>{reading}</span></div>)}
+          {pack.preview.map(([symbol, reading]) => <div key={symbol}><strong className={symbol.includes('·') ? 'kana-preview-pair' : ''}>{symbol}</strong><span>{reading}</span></div>)}
         </div>
         <button className="primary-button" onClick={onStart}><CirclePlay size={18} fill="currentColor" />继续课程</button>
       </section>
+
+      {pack.kanaPairs && <KanaComparison pairs={pack.kanaPairs} onPractice={onStart} />}
 
       <div className="section-heading learning-heading">
         <div><p className="eyebrow">ALL COURSES</p><h2>全部阶段</h2></div>
@@ -641,6 +861,34 @@ function LearnPage({ pack, lessonsCompleted, onStart }: { pack: LanguagePack; le
         ))}
       </section>
     </div>
+  )
+}
+
+function KanaComparison({ pairs, onPractice }: { pairs: KanaPair[]; onPractice: () => void }) {
+  const rows = [...new Set(pairs.map((pair) => pair.row))]
+  return (
+    <section className="kana-comparison">
+      <div className="section-heading">
+        <div><p className="eyebrow">KANA COMPARISON</p><h2>平假名 · 片假名对照</h2></div>
+        <div className="kana-legend"><span>平</span><ArrowLeftRight size={14} /><span>片</span></div>
+      </div>
+      <p className="kana-comparison-note">两种写法共用同一套读音。平假名常用于日语词和语法，片假名常用于外来语。</p>
+      <div className="kana-chart" role="table" aria-label="平假名与片假名五十音对照表">
+        {rows.map((row) => (
+          <div className="kana-chart-row" role="row" key={row}>
+            <strong className="kana-row-label" role="rowheader">{row}</strong>
+            <div className="kana-pair-list">
+              {pairs.filter((pair) => pair.row === row).map((pair) => (
+                <div className="kana-pair-cell" role="cell" key={pair.reading}>
+                  <b>{pair.hiragana}</b><b>{pair.katakana}</b><span>{pair.reading}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="secondary-button kana-practice-button" onClick={onPractice}><CirclePlay size={17} />开始对比练习</button>
+    </section>
   )
 }
 
@@ -734,6 +982,11 @@ function ReviewPage({
           </p>
           <div className="flashcard">
             <span className={`flashcard-symbol ${current.prompt.length > 2 ? 'flashcard-symbol-text' : ''}`}>{current.prompt}</span>
+            {current.pairedPrompt && (
+              <span className="flashcard-counterpart">
+                <small>{current.scriptLabel}</small><ArrowLeftRight size={15} /><strong>{current.pairedPrompt}</strong><small>{current.scriptLabel === '平假名' ? '片假名' : '平假名'}</small>
+              </span>
+            )}
             <AudioButton text={current.speakText} locale={pack.locale} label={current.group === 'kana' ? '播放读音' : '播放单词'} className="flashcard-audio" />
             {revealed ? (
               <span className="flashcard-answer">
@@ -851,19 +1104,27 @@ function SettingsPage({
   activeLanguage,
   onLanguageChange,
   state,
+  rewards,
   updateSetting,
+  onSelectTheme,
 }: {
   pack: LanguagePack
   activeLanguage: LanguageCode
   onLanguageChange: (language: LanguageCode) => void
   state: AppState
+  rewards: RewardsState
   updateSetting: <K extends keyof AppState>(key: K, value: AppState[K]) => void
+  onSelectTheme: (themeId: ThemeId) => void
 }) {
   return (
     <div className="page-stack settings-page">
       <section className="page-intro"><div><p className="eyebrow">PREFERENCES</p><h1>学习设置</h1><p>让计划符合你的时间和学习节奏。</p></div></section>
       <section className="settings-section">
-        <div className="settings-heading"><span>01</span><div><h2>学习语言</h2><p>每种语言的课程、复习和统计独立保存。</p></div></div>
+        <div className="settings-heading"><span>01</span><div><h2>主题与积分</h2><p>每日完成计划获得积分，兑换后可永久使用主题。</p></div></div>
+        <ThemeStore rewards={rewards} onSelect={onSelectTheme} />
+      </section>
+      <section className="settings-section">
+        <div className="settings-heading"><span>02</span><div><h2>学习语言</h2><p>每种语言的课程、复习和统计独立保存。</p></div></div>
         <div className="segmented-control language-segments" role="group" aria-label="选择学习语言">
           {languageOptions.map((language) => (
             <button key={language.code} className={activeLanguage === language.code ? 'active' : ''} onClick={() => onLanguageChange(language.code)}>
@@ -873,7 +1134,7 @@ function SettingsPage({
         </div>
       </section>
       <section className="settings-section">
-        <div className="settings-heading"><span>02</span><div><h2>每日目标</h2><p>当前为{pack.name}设置，系统会据此衡量每日进度。</p></div></div>
+        <div className="settings-heading"><span>03</span><div><h2>每日目标</h2><p>当前为{pack.name}设置，系统会据此衡量每日进度。</p></div></div>
         <div className="segmented-control" role="group" aria-label="每日学习时长">
           {[15, 30, 45, 60].map((minutes) => (
             <button key={minutes} className={state.dailyGoal === minutes ? 'active' : ''} onClick={() => updateSetting('dailyGoal', minutes)}>
@@ -883,7 +1144,7 @@ function SettingsPage({
         </div>
       </section>
       <section className="settings-section">
-        <div className="settings-heading"><span>03</span><div><h2>提醒与声音</h2><p>在你设定的时间提示当天未完成的任务。</p></div></div>
+        <div className="settings-heading"><span>04</span><div><h2>提醒与声音</h2><p>在你设定的时间提示当天未完成的任务。</p></div></div>
         <div className="setting-list">
           <SettingToggle label="每日学习提醒" description="未完成计划时发送一次提醒" checked={state.reminderEnabled} onChange={(value) => updateSetting('reminderEnabled', value)} />
           <div className="setting-row">
@@ -894,12 +1155,92 @@ function SettingsPage({
         </div>
       </section>
       <section className="settings-section">
-        <div className="settings-heading"><span>04</span><div><h2>监督方式</h2><p>严格模式会要求通过测验后才能完成学习任务。</p></div></div>
+        <div className="settings-heading"><span>05</span><div><h2>监督方式</h2><p>严格模式会要求通过测验后才能完成学习任务。</p></div></div>
         <div className="setting-list">
           <SettingToggle label="严格验收模式" description="正确率达到 80% 才将任务标记为完成" checked={state.strictMode} onChange={(value) => updateSetting('strictMode', value)} />
         </div>
       </section>
+      <section className="settings-section">
+        <div className="settings-heading"><span>06</span><div><h2>账号找回</h2><p>设置或更换找回关键字，需要验证当前登录密码。</p></div></div>
+        <RecoveryKeywordForm />
+      </section>
     </div>
+  )
+}
+
+function ThemeStore({ rewards, onSelect }: { rewards: RewardsState; onSelect: (themeId: ThemeId) => void }) {
+  return (
+    <div className="theme-store">
+      <div className="theme-balance"><Coins size={18} /><span>可用积分</span><strong>{rewards.points}</strong><small>累计打卡 {rewards.checkInDates.length} 天</small></div>
+      <div className="theme-grid">
+        {themeCatalog.map((theme) => {
+          const unlocked = rewards.unlockedThemes.includes(theme.id)
+          const active = rewards.activeTheme === theme.id
+          const affordable = rewards.points >= theme.cost
+          return (
+            <article className={`theme-card ${active ? 'active' : ''}`} key={theme.id}>
+              <div className="theme-preview" aria-hidden="true">
+                {theme.swatches.map((color) => <i key={color} style={{ background: color }} />)}
+              </div>
+              <div className="theme-card-copy"><h3>{theme.name}</h3><p>{theme.description}</p></div>
+              <button
+                className={active ? 'theme-action active' : 'theme-action'}
+                onClick={() => onSelect(theme.id)}
+                disabled={active || (!unlocked && !affordable)}
+                title={!unlocked && !affordable ? `还差 ${theme.cost - rewards.points} 积分` : undefined}
+              >
+                {active ? <><Check size={15} />使用中</> : unlocked ? <><Palette size={15} />启用</> : <><LockKeyhole size={14} />兑换 {theme.cost}</>}
+              </button>
+            </article>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RecoveryKeywordForm() {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [keyword, setKeyword] = useState('')
+  const [confirmKeyword, setConfirmKeyword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    if (keyword !== confirmKeyword) {
+      setError('两次输入的找回关键字不一致')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const result = await updateRecoveryKeyword(currentPassword, keyword)
+      setCurrentPassword('')
+      setKeyword('')
+      setConfirmKeyword('')
+      setMessage(result.message)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '更新失败，请稍后再试')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="security-form" onSubmit={submit}>
+      <label><span>当前密码</span><input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label>
+      <label><span>新找回关键字</span><input type="password" autoComplete="off" value={keyword} onChange={(event) => setKeyword(event.target.value)} minLength={6} maxLength={64} placeholder="6 至 64 位私密短语" required /></label>
+      <label><span>确认关键字</span><input type="password" autoComplete="off" value={confirmKeyword} onChange={(event) => setConfirmKeyword(event.target.value)} minLength={6} maxLength={64} required /></label>
+      {error && <div className="login-error" role="alert">{error}</div>}
+      {message && <div className="login-success" role="status"><CircleCheck size={16} />{message}</div>}
+      <button type="submit" className="primary-button" disabled={submitting}>
+        {submitting ? <LoaderCircle className="spin" size={17} /> : <KeyRound size={17} />}
+        {submitting ? '正在保存' : '保存找回关键字'}
+      </button>
+    </form>
   )
 }
 
@@ -919,6 +1260,8 @@ interface LessonQuestion {
   answer: string
   example?: string
   exampleMeaning?: string
+  pairedPrompt?: string
+  scriptLabel?: string
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -935,7 +1278,7 @@ function pickDistractors(pool: string[], answer: string, count: number): string[
 }
 
 /** 出题：优先选择还没学过的内容，其次按到期顺序 */
-function buildQuestions(pack: LanguagePack, kind: TaskKind, cardProgress: AppState['cardProgress']): LessonQuestion[] {
+function buildQuestions(pack: LanguagePack, kind: TaskKind, cardProgress: AppState['cardProgress'], lessonSequence = 0): LessonQuestion[] {
   if (kind === 'vocabulary') {
     const sortedVocab = [...pack.vocabEntries].sort((a, b) => {
       const aReps = cardProgress[`${pack.code}-vocab-${a.word}`]?.reps ?? -1
@@ -958,10 +1301,41 @@ function buildQuestions(pack: LanguagePack, kind: TaskKind, cardProgress: AppSta
     const bReps = cardProgress[`${pack.code}-kana-${b.symbol}`]?.reps ?? -1
     return aReps - bReps
   })
-  const selected = sortedKana.slice(0, 5)
+  let selected: typeof sortedKana = []
+  if (pack.kanaPairs) {
+    const groupStart = (Math.floor(lessonSequence / 2) * 5) % pack.kanaPairs.length
+    const activePairs = Array.from({ length: Math.min(5, pack.kanaPairs.length) }, (_, index) => pack.kanaPairs![(groupStart + index) % pack.kanaPairs!.length])
+    selected = activePairs.map((pair, index) => {
+      const useKatakana = (lessonSequence + index) % 2 === 1
+      const symbol = useKatakana ? pair.katakana : pair.hiragana
+      return pack.foundationEntries.find((entry) => entry.symbol === symbol)!
+    })
+  } else {
+    const selectedReadings = new Set<string>()
+    for (const entry of sortedKana) {
+      if (selectedReadings.has(entry.reading)) continue
+      selected.push(entry)
+      selectedReadings.add(entry.reading)
+      if (selected.length === 5) break
+    }
+  }
 
   if (kind === 'listening') {
     const canSpeak = 'speechSynthesis' in window
+    if (pack.kanaPairs) {
+      const pairOptions = pack.kanaPairs.map((pair) => `${pair.hiragana} / ${pair.katakana}`)
+      return selected.map((entry) => {
+        const answer = entry.scriptLabel === '片假名'
+          ? `${entry.pairedSymbol} / ${entry.symbol}`
+          : `${entry.symbol} / ${entry.pairedSymbol}`
+        return {
+          prompt: canSpeak ? '' : entry.reading,
+          speakText: entry.symbol,
+          options: shuffle([answer, ...pickDistractors(pairOptions, answer, 2)]),
+          answer,
+        }
+      })
+    }
     return selected.map((entry) => ({
       prompt: canSpeak ? '' : entry.reading,
       speakText: entry.symbol,
@@ -970,12 +1344,14 @@ function buildQuestions(pack: LanguagePack, kind: TaskKind, cardProgress: AppSta
     }))
   }
 
-  const readings = pack.foundationEntries.map((entry) => entry.reading)
+  const readings = [...new Set(pack.foundationEntries.map((entry) => entry.reading))]
   return selected.map((entry) => ({
     prompt: entry.symbol,
     speakText: entry.symbol,
     options: shuffle([entry.reading, ...pickDistractors(readings, entry.reading, 2)]),
     answer: entry.reading,
+    pairedPrompt: entry.pairedSymbol,
+    scriptLabel: entry.scriptLabel,
   }))
 }
 
@@ -983,6 +1359,7 @@ function LessonModal({
   pack,
   task,
   cardProgress,
+  lessonSequence,
   soundEnabled,
   strictMode,
   onClose,
@@ -991,6 +1368,7 @@ function LessonModal({
   pack: LanguagePack
   task: DailyTask
   cardProgress: AppState['cardProgress']
+  lessonSequence: number
   soundEnabled: boolean
   strictMode: boolean
   onClose: () => void
@@ -1001,7 +1379,7 @@ function LessonModal({
   const [checked, setChecked] = useState(false)
   const [correctCount, setCorrectCount] = useState(0)
   const [finished, setFinished] = useState(false)
-  const [questions, setQuestions] = useState<LessonQuestion[]>(() => buildQuestions(pack, task.kind, cardProgress))
+  const [questions, setQuestions] = useState<LessonQuestion[]>(() => buildQuestions(pack, task.kind, cardProgress, lessonSequence))
   const question = questions[step]
   const isCorrect = selected === question?.answer
   const accuracy = Math.round((correctCount / questions.length) * 100)
@@ -1026,7 +1404,7 @@ function LessonModal({
   }
 
   const retry = () => {
-    setQuestions(buildQuestions(pack, task.kind, cardProgress))
+    setQuestions(buildQuestions(pack, task.kind, cardProgress, lessonSequence))
     setStep(0)
     setSelected(null)
     setChecked(false)
@@ -1061,6 +1439,11 @@ function LessonModal({
             <h2>{task.kind === 'listening' ? '听到的是哪个内容？' : task.kind === 'vocabulary' ? '这个词是什么意思？' : `${pack.foundationLabel}怎么读？`}</h2>
             {question.prompt && (
               <div className={`quiz-symbol ${question.prompt.length > 2 ? 'quiz-symbol-text' : ''}`}>{question.prompt}</div>
+            )}
+            {question.pairedPrompt && (
+              <div className="quiz-kana-pair">
+                <span>{question.scriptLabel} {question.prompt}</span><ArrowLeftRight size={15} /><span>{question.scriptLabel === '平假名' ? '片假名' : '平假名'} {question.pairedPrompt}</span>
+              </div>
             )}
             {task.kind === 'listening' && !question.prompt ? (
               <button className="listen-button listen-large" onClick={() => speak(question.speakText)}><Volume2 size={20} />播放读音</button>

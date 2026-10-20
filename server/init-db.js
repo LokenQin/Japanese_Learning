@@ -3,18 +3,22 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import mysql from 'mysql2/promise'
 import { getDatabaseConfig } from './config.js'
-import { hashPassword } from './security.js'
+import { hashPassword, hashRecoveryKeyword, normalizeRecoveryKeyword } from './security.js'
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase()
 const password = process.env.ADMIN_PASSWORD
+const recoveryKeyword = normalizeRecoveryKeyword(process.env.ADMIN_RECOVERY_KEYWORD)
 const displayName = process.env.ADMIN_DISPLAY_NAME?.trim() || '学习者'
 
-if (!email || !password) {
-  throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required for database initialization')
+if (!email || !password || !recoveryKeyword) {
+  throw new Error('ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_RECOVERY_KEYWORD are required for database initialization')
 }
 if (password.length < 10) {
   throw new Error('ADMIN_PASSWORD must contain at least 10 characters')
+}
+if (Array.from(recoveryKeyword).length < 6 || Array.from(recoveryKeyword).length > 64) {
+  throw new Error('ADMIN_RECOVERY_KEYWORD must contain 6 to 64 characters')
 }
 
 const schema = await readFile(resolve(currentDirectory, '../database/schema.sql'), 'utf8')
@@ -33,15 +37,21 @@ try {
   )
   await connection.changeUser({ database: databaseName })
   await connection.query(schema)
-  const { salt, hash } = await hashPassword(password)
+  const [{ salt, hash }, keywordDigest] = await Promise.all([
+    hashPassword(password),
+    hashRecoveryKeyword(recoveryKeyword),
+  ])
   await connection.execute(
-    `INSERT INTO users (email, display_name, password_salt, password_hash)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO users
+     (email, display_name, password_salt, password_hash, recovery_keyword_salt, recovery_keyword_hash)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        display_name = VALUES(display_name),
        password_salt = VALUES(password_salt),
-       password_hash = VALUES(password_hash)`,
-    [email, displayName, salt, hash],
+       password_hash = VALUES(password_hash),
+       recovery_keyword_salt = VALUES(recovery_keyword_salt),
+       recovery_keyword_hash = VALUES(recovery_keyword_hash)`,
+    [email, displayName, salt, hash, keywordDigest.salt, keywordDigest.hash],
   )
   console.log(`Database initialized. Login account: ${email}`)
 } catch (error) {

@@ -34,4 +34,15 @@ export const apiConfig = {
   sessionDays: Math.max(1, Number(process.env.SESSION_DAYS || 30)),
   allowRegistration: process.env.ALLOW_REGISTRATION !== 'false',
   trustProxy: process.env.TRUST_PROXY === 'true',
+  production: process.env.NODE_ENV === 'production',
+  secureCookies: process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production',
+  allowedOrigins: String(process.env.APP_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean),
+  publicUrl: String(process.env.APP_PUBLIC_URL || '').trim().replace(/\/$/, ''),
+}
+
+if (apiConfig.production && apiConfig.allowedOrigins.length === 0) {
+  throw new Error('Missing required environment variable for production: APP_ORIGINS')
 }

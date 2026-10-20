@@ -1,0 +1,23 @@
+[Unit]
+Description=Kotoba isolated Nginx reverse proxy
+After=network-online.target kotoba.service
+Wants=network-online.target
+Requires=kotoba.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/sbin/nginx -t -c /etc/kotoba-nginx/nginx.conf
+ExecStart=/usr/sbin/nginx -c /etc/kotoba-nginx/nginx.conf -g "daemon off;"
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+KillSignal=SIGQUIT
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/run /var/log/nginx /var/cache/kotoba-nginx
+
+[Install]
+WantedBy=multi-user.target

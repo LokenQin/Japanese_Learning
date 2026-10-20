@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright-core'
 
 await mkdir('artifacts', { recursive: true })
+const siteUrl = (process.env.SITE_URL || 'http://127.0.0.1:5173').replace(/\/$/, '')
 
 let savedState = null
 const mockApi = createServer(async (request, response) => {
@@ -32,6 +33,9 @@ const mockApi = createServer(async (request, response) => {
       token: origin === 'null' ? 'test-session' : undefined,
       user: { id: '2', email: 'new@example.com', displayName: '新同学' },
     }))
+  }
+  if (request.url === '/api/auth/recovery-keyword' && request.method === 'PUT' && authenticated) {
+    return response.end(JSON.stringify({ message: '找回关键字已更新。' }))
   }
   if (request.url === '/api/auth/me') {
     return response.end(JSON.stringify(authenticated
@@ -73,6 +77,8 @@ async function register(page) {
   await page.getByLabel('邮箱').fill('new@example.com')
   await page.getByLabel('密码', { exact: true }).fill('test-password-123')
   await page.getByLabel('确认密码').fill('test-password-123')
+  await page.getByLabel('找回关键字', { exact: true }).fill('private recovery phrase')
+  await page.getByLabel('确认找回关键字').fill('private recovery phrase')
   await page.getByRole('button', { name: '创建账户', exact: true }).click()
   await page.getByRole('heading', { name: 'おはよう，新同学。' }).waitFor()
 }
@@ -88,7 +94,7 @@ for (const viewport of [
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto('http://127.0.0.1:5173', { waitUntil: 'networkidle' })
+  await page.goto(siteUrl, { waitUntil: 'networkidle' })
   await page.screenshot({ path: `artifacts/login-${viewport.name}.png`, fullPage: true })
   await login(page)
   await page.screenshot({ path: `artifacts/today-${viewport.name}.png`, fullPage: true })
@@ -131,12 +137,13 @@ interactionPage.on('console', (message) => {
   if (message.type() === 'error') interactionErrors.push(message.text())
 })
 interactionPage.on('pageerror', (error) => interactionErrors.push(error.message))
-await interactionPage.goto('http://127.0.0.1:5173', { waitUntil: 'networkidle' })
+await interactionPage.goto(siteUrl, { waitUntil: 'networkidle' })
 await login(interactionPage)
 
 // 完成一次完整的假名课程（未学内容按顺序出题：あいうえお）
 await interactionPage.getByRole('button', { name: '继续学习' }).click()
-await interactionPage.getByText('平假名 · 认读', { exact: true }).waitFor()
+await interactionPage.getByText('平假名与片假名 · 认读', { exact: true }).waitFor()
+const lessonPairVisible = await interactionPage.locator('.quiz-kana-pair').isVisible()
 const readings = ['a', 'i', 'u', 'e', 'o']
 for (const [index, reading] of readings.entries()) {
   await interactionPage.getByRole('button', { name: reading, exact: true }).click()
@@ -158,13 +165,22 @@ const lessonState = {
   minutesLogged: profile('ja')?.studyLog?.[todayKey] === 8,
   lessonCounted: profile('ja')?.lessonsCompleted === 1,
 }
-results.push({ interaction: 'lesson-completion', lessonSummaryVisible, ...lessonState })
+results.push({ interaction: 'lesson-completion', lessonSummaryVisible, lessonPairVisible, ...lessonState })
+
+// 日语听力使用成对选项，避免同音的平假名和片假名同时成为正确答案。
+await interactionPage.locator('.task-row').filter({ hasText: '听音辨认' }).locator('.task-copy').click()
+await interactionPage.getByText('听力 · 辨认', { exact: true }).waitFor()
+const listeningOptions = await interactionPage.locator('.quiz-options button').allTextContents()
+const pairedListeningOptions = listeningOptions.length === 3 && listeningOptions.every((option) => option.includes('/'))
+await interactionPage.getByRole('button', { name: '关闭课程' }).click()
+results.push({ interaction: 'kana-paired-listening', pairedListeningOptions, listeningOptions })
 
 // 复习流程：评分一张卡片后队列缩短，卡片进度写入状态
 await interactionPage.locator('.side-nav button', { hasText: '复习' }).click()
 await interactionPage.getByText('记忆复习').waitFor()
 const queueCountBefore = await interactionPage.locator('.queue-title strong').textContent()
 const reviewAudioVisible = await interactionPage.getByRole('button', { name: '播放读音：あ' }).isVisible()
+const reviewPairVisible = (await interactionPage.locator('.flashcard-counterpart').textContent())?.includes('ア') === true
 await interactionPage.getByRole('button', { name: '显示答案' }).click()
 await interactionPage.getByRole('button', { name: '记得' }).click()
 const queueCountAfter = await interactionPage.locator('.queue-title strong').textContent()
@@ -174,14 +190,21 @@ results.push({
   queueCountBefore: Number(queueCountBefore),
   queueCountAfter: Number(queueCountAfter),
   reviewAudioVisible,
+  reviewPairVisible,
   cardScheduled: profile('ja')?.cardProgress?.['ja-kana-あ']?.reps === 1,
   reviewTaskStillOpen: profile('ja')?.tasks?.find((task) => task.kind === 'review')?.completed === false,
 })
 
 await interactionPage.getByRole('button', { name: '设置', exact: true }).click()
 await interactionPage.getByRole('button', { name: '45 分钟' }).click()
+await interactionPage.getByLabel('当前密码').fill('test-password')
+await interactionPage.getByLabel('新找回关键字').fill('updated recovery phrase')
+await interactionPage.getByLabel('确认关键字').fill('updated recovery phrase')
+await interactionPage.getByRole('button', { name: '保存找回关键字' }).click()
+await interactionPage.getByRole('status').waitFor()
+await interactionPage.screenshot({ path: 'artifacts/settings-desktop.png', fullPage: true })
 await interactionPage.waitForTimeout(900)
-results.push({ interaction: 'cloud-settings', persistedGoal: profile('ja')?.dailyGoal, errors: interactionErrors })
+results.push({ interaction: 'cloud-settings', persistedGoal: profile('ja')?.dailyGoal, recoveryKeywordUpdated: true, errors: interactionErrors })
 
 // 切换语言后使用独立档案，并将选择保存到云端。
 await interactionPage.locator('.language-switcher select').selectOption('en')
@@ -210,7 +233,7 @@ await interactionPage.close()
 
 const registrationPage = await browser.newPage({ viewport: { width: 1280, height: 900 } })
 savedState = null
-await registrationPage.goto('http://127.0.0.1:5173', { waitUntil: 'networkidle' })
+await registrationPage.goto(siteUrl, { waitUntil: 'networkidle' })
 await registrationPage.getByRole('tab', { name: '注册' }).click()
 await registrationPage.screenshot({ path: 'artifacts/register-desktop.png', fullPage: true })
 await register(registrationPage)

@@ -48,14 +48,28 @@ export async function login(email: string, password: string) {
   return result.user
 }
 
-export async function register(displayName: string, email: string, password: string) {
+export async function register(displayName: string, email: string, password: string, recoveryKeyword: string) {
   const result = await request<{ token?: string; user: AuthUser }>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ displayName, email, password }),
+    body: JSON.stringify({ displayName, email, password, recoveryKeyword }),
   })
   if (result.token) localStorage.setItem(TOKEN_KEY, result.token)
   else clearToken()
   return result.user
+}
+
+export async function resetPassword(email: string, recoveryKeyword: string, password: string) {
+  return request<{ message: string }>('/auth/password/reset', {
+    method: 'POST',
+    body: JSON.stringify({ email, recoveryKeyword, password }),
+  })
+}
+
+export async function updateRecoveryKeyword(currentPassword: string, recoveryKeyword: string) {
+  return request<{ message: string }>('/auth/recovery-keyword', {
+    method: 'PUT',
+    body: JSON.stringify({ currentPassword, recoveryKeyword }),
+  })
 }
 
 export async function getCurrentUser() {
@@ -71,7 +85,9 @@ export async function getCurrentUser() {
 
 export async function logout() {
   try {
-    if (getToken()) await request<void>('/auth/logout', { method: 'POST' })
+    if (window.location.protocol !== 'file:' || getToken()) {
+      await request<void>('/auth/logout', { method: 'POST' })
+    }
   } finally {
     clearToken()
   }

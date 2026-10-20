@@ -3,17 +3,28 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n web,api -c blue,green \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
     "dev:api": "node --watch server/index.js",
     "build": "tsc -b && vite build && npm run build:static",
-    "build:static": "esbuild src/main.tsx --bundle --format=iife --platform=browser --target=es2020 --jsx=automatic --minify --outfile=static/app.js",
+    "build:static": "esbuild src/main.tsx --bundle --format=iife --platform=browser --target=es2020 --jsx=automatic --minify --outfile=static/app.js && esbuild src/styles.css --minify --outfile=static/app.css",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node server/index.js",
     "db:init": "node server/init-db.js",
-    "test:cloud": "node scripts/cloud-smoke.mjs"
+    "db:migrate": "node server/migrate-db.js",
+    "test": "node --test",
+    "test:cloud": "node scripts/cloud-smoke.mjs",
+    "test:password-reset": "node scripts/password-reset-smoke.mjs",
+    "test:cleanup": "node scripts/cleanup-smoke-users.mjs",
+    "test:password-reset-ui": "node scripts/password-reset-visual-check.mjs",
+    "test:public-ui": "node scripts/public-visual-check.mjs",
+    "test:responsive": "node scripts/responsive-check.mjs",
+    "test:rewards-ui": "node scripts/rewards-visual-check.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -31,10 +42,10 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "concurrently": "latest",
+    "esbuild": "latest",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
-    "esbuild": "latest",
     "globals": "latest",
     "playwright-core": "^1.62.1",
     "typescript": "~5.9.3",

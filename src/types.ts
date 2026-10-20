@@ -8,6 +8,8 @@ export type Rating = 'again' | 'hard' | 'good' | 'easy'
 
 export type CardGroup = 'kana' | 'vocab'
 
+export type ThemeId = 'classic' | 'sakura' | 'forest' | 'midnight'
+
 export interface DailyTask {
   id: string
   title: string
@@ -25,6 +27,8 @@ export interface ReviewCard {
   hint: string
   group: CardGroup
   speakText: string
+  pairedPrompt?: string
+  scriptLabel?: string
   example?: string
   exampleMeaning?: string
 }
@@ -56,8 +60,16 @@ export interface AppState {
   reminderTime: string
 }
 
+export interface RewardsState {
+  points: number
+  checkInDates: string[]
+  unlockedThemes: ThemeId[]
+  activeTheme: ThemeId
+}
+
 export interface LearningStateEnvelope {
-  version: 2
+  version: 3
   activeLanguage: LanguageCode
   profiles: Record<LanguageCode, AppState>
+  rewards: RewardsState
 }

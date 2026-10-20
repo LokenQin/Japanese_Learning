@@ -1,0 +1,25 @@
+[Unit]
+Description=Kotoba language learning website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kotoba
+Group=kotoba
+WorkingDirectory=/opt/kotoba
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/kotoba/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

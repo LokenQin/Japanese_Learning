@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew Kotoba TLS certificates with acme.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/acme.sh/acme.sh --cron --home /opt/acme.sh --config-home /etc/acme.sh --cert-home /etc/acme.sh/certs
+

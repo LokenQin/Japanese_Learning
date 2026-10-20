@@ -1,6 +1,7 @@
 import type { AppState, CardGroup, LanguageCode, ReviewCard } from './types'
 
-export interface FoundationEntry { symbol: string; reading: string; row: string; hint: string }
+export interface FoundationEntry { symbol: string; reading: string; row: string; hint: string; pairedSymbol?: string; scriptLabel?: string }
+export interface KanaPair { hiragana: string; katakana: string; reading: string; row: string }
 export interface VocabEntry { word: string; reading: string; meaning: string; hint: string; example: string; exampleMeaning: string }
 export interface Course { id: string; index: string; title: string; subtitle: string; description: string; lessons: number; duration: string }
 export interface LanguagePack {
@@ -9,19 +10,26 @@ export interface LanguagePack {
   foundationLabel: string; foundationPrompt: string; vocabularyLabel: string; vocabularyPrompt: string
   foundationEntries: FoundationEntry[]; vocabEntries: VocabEntry[]; reviewCards: ReviewCard[]
   dailyTasks: AppState['tasks']; courses: Course[]; preview: readonly (readonly [string, string])[]
+  kanaPairs?: KanaPair[]
 }
 
-const japaneseFoundation: FoundationEntry[] = [
-  ['あ', 'a', 'あ行'], ['い', 'i', 'あ行'], ['う', 'u', 'あ行'], ['え', 'e', 'あ行'], ['お', 'o', 'あ行'],
-  ['か', 'ka', 'か行'], ['き', 'ki', 'か行'], ['く', 'ku', 'か行'], ['け', 'ke', 'か行'], ['こ', 'ko', 'か行'],
-  ['さ', 'sa', 'さ行'], ['し', 'shi', 'さ行'], ['す', 'su', 'さ行'], ['せ', 'se', 'さ行'], ['そ', 'so', 'さ行'],
-  ['た', 'ta', 'た行'], ['ち', 'chi', 'た行'], ['つ', 'tsu', 'た行'], ['て', 'te', 'た行'], ['と', 'to', 'た行'],
-  ['な', 'na', 'な行'], ['に', 'ni', 'な行'], ['ぬ', 'nu', 'な行'], ['ね', 'ne', 'な行'], ['の', 'no', 'な行'],
-  ['は', 'ha', 'は行'], ['ひ', 'hi', 'は行'], ['ふ', 'fu', 'は行'], ['へ', 'he', 'は行'], ['ほ', 'ho', 'は行'],
-  ['ま', 'ma', 'ま行'], ['み', 'mi', 'ま行'], ['む', 'mu', 'ま行'], ['め', 'me', 'ま行'], ['も', 'mo', 'ま行'],
-  ['や', 'ya', 'や行'], ['ゆ', 'yu', 'や行'], ['よ', 'yo', 'や行'], ['ら', 'ra', 'ら行'], ['り', 'ri', 'ら行'],
-  ['る', 'ru', 'ら行'], ['れ', 're', 'ら行'], ['ろ', 'ro', 'ら行'], ['わ', 'wa', 'わ行'], ['を', 'wo', 'わ行'], ['ん', 'n', 'わ行'],
-].map(([symbol, reading, row]) => ({ symbol, reading, row, hint: `${row}平假名，读作 ${reading}` }))
+export const japaneseKanaPairs: KanaPair[] = [
+  ['あ', 'ア', 'a', 'あ行'], ['い', 'イ', 'i', 'あ行'], ['う', 'ウ', 'u', 'あ行'], ['え', 'エ', 'e', 'あ行'], ['お', 'オ', 'o', 'あ行'],
+  ['か', 'カ', 'ka', 'か行'], ['き', 'キ', 'ki', 'か行'], ['く', 'ク', 'ku', 'か行'], ['け', 'ケ', 'ke', 'か行'], ['こ', 'コ', 'ko', 'か行'],
+  ['さ', 'サ', 'sa', 'さ行'], ['し', 'シ', 'shi', 'さ行'], ['す', 'ス', 'su', 'さ行'], ['せ', 'セ', 'se', 'さ行'], ['そ', 'ソ', 'so', 'さ行'],
+  ['た', 'タ', 'ta', 'た行'], ['ち', 'チ', 'chi', 'た行'], ['つ', 'ツ', 'tsu', 'た行'], ['て', 'テ', 'te', 'た行'], ['と', 'ト', 'to', 'た行'],
+  ['な', 'ナ', 'na', 'な行'], ['に', 'ニ', 'ni', 'な行'], ['ぬ', 'ヌ', 'nu', 'な行'], ['ね', 'ネ', 'ne', 'な行'], ['の', 'ノ', 'no', 'な行'],
+  ['は', 'ハ', 'ha', 'は行'], ['ひ', 'ヒ', 'hi', 'は行'], ['ふ', 'フ', 'fu', 'は行'], ['へ', 'ヘ', 'he', 'は行'], ['ほ', 'ホ', 'ho', 'は行'],
+  ['ま', 'マ', 'ma', 'ま行'], ['み', 'ミ', 'mi', 'ま行'], ['む', 'ム', 'mu', 'ま行'], ['め', 'メ', 'me', 'ま行'], ['も', 'モ', 'mo', 'ま行'],
+  ['や', 'ヤ', 'ya', 'や行'], ['ゆ', 'ユ', 'yu', 'や行'], ['よ', 'ヨ', 'yo', 'や行'],
+  ['ら', 'ラ', 'ra', 'ら行'], ['り', 'リ', 'ri', 'ら行'], ['る', 'ル', 'ru', 'ら行'], ['れ', 'レ', 're', 'ら行'], ['ろ', 'ロ', 'ro', 'ら行'],
+  ['わ', 'ワ', 'wa', 'わ行・ん'], ['を', 'ヲ', 'wo', 'わ行・ん'], ['ん', 'ン', 'n', 'わ行・ん'],
+].map(([hiragana, katakana, reading, row]) => ({ hiragana, katakana, reading, row }))
+
+const japaneseFoundation: FoundationEntry[] = japaneseKanaPairs.flatMap((pair) => [
+  { symbol: pair.hiragana, pairedSymbol: pair.katakana, reading: pair.reading, row: pair.row, scriptLabel: '平假名', hint: `${pair.row}：平假名 ${pair.hiragana}，对应片假名 ${pair.katakana}，读作 ${pair.reading}` },
+  { symbol: pair.katakana, pairedSymbol: pair.hiragana, reading: pair.reading, row: pair.row, scriptLabel: '片假名', hint: `${pair.row}：片假名 ${pair.katakana}，对应平假名 ${pair.hiragana}，读作 ${pair.reading}` },
+])
 
 const japaneseVocab: VocabEntry[] = [
   ['おはよう', 'ohayou', '早上好', '早晨见面时使用', 'おはようございます。', '早上好。'],
@@ -74,7 +82,7 @@ const spanishVocab: VocabEntry[] = [
 
 function cards(code: LanguageCode, foundation: FoundationEntry[], vocab: VocabEntry[]): ReviewCard[] {
   return [
-    ...foundation.map((entry) => ({ id: `${code}-kana-${entry.symbol}`, prompt: entry.symbol, reading: entry.reading, answer: entry.row, hint: entry.hint, group: 'kana' as CardGroup, speakText: entry.symbol })),
+    ...foundation.map((entry) => ({ id: `${code}-kana-${entry.symbol}`, prompt: entry.symbol, pairedPrompt: entry.pairedSymbol, scriptLabel: entry.scriptLabel, reading: entry.reading, answer: entry.row, hint: entry.hint, group: 'kana' as CardGroup, speakText: entry.symbol })),
     ...vocab.map((entry) => ({ id: `${code}-vocab-${entry.word}`, prompt: entry.word, reading: entry.reading, answer: entry.meaning, hint: entry.hint, group: 'vocab' as CardGroup, speakText: entry.word, example: entry.example, exampleMeaning: entry.exampleMeaning })),
   ]
 }
@@ -89,17 +97,20 @@ function tasks(code: LanguageCode, foundationLabel: string): AppState['tasks'] {
 }
 
 function pack(config: Omit<LanguagePack, 'reviewCards' | 'dailyTasks' | 'preview'>): LanguagePack {
-  return { ...config, reviewCards: cards(config.code, config.foundationEntries, config.vocabEntries), dailyTasks: tasks(config.code, config.foundationLabel), preview: config.foundationEntries.slice(0, 5).map((entry) => [entry.symbol, entry.reading] as const) }
+  const preview = config.kanaPairs
+    ? config.kanaPairs.slice(0, 5).map((entry) => [`${entry.hiragana}·${entry.katakana}`, entry.reading] as const)
+    : config.foundationEntries.slice(0, 5).map((entry) => [entry.symbol, entry.reading] as const)
+  return { ...config, reviewCards: cards(config.code, config.foundationEntries, config.vocabEntries), dailyTasks: tasks(config.code, config.foundationLabel), preview }
 }
 
 export const languagePacks: Record<LanguageCode, LanguagePack> = {
   ja: pack({
     code: 'ja', name: '日语', nativeName: '日本語', locale: 'ja-JP', brandMark: 'こ', greeting: 'おはよう',
     pathDescription: '循序完成每个阶段，打好日语基础。', quote: { native: '継続は力なり', translation: '坚持就是力量' },
-    foundationLabel: '平假名', foundationPrompt: '请读出这个假名', vocabularyLabel: '基础词汇', vocabularyPrompt: '请说出这个词的意思', foundationEntries: japaneseFoundation, vocabEntries: japaneseVocab,
+    foundationLabel: '平假名与片假名', foundationPrompt: '请读出假名并辨认对应写法', vocabularyLabel: '基础词汇', vocabularyPrompt: '请说出这个词的意思', foundationEntries: japaneseFoundation, vocabEntries: japaneseVocab, kanaPairs: japaneseKanaPairs,
     courses: [
-      { id: 'hiragana', index: '01', title: '平假名入门', subtitle: 'Hiragana', description: '掌握 46 个基础平假名及其发音', lessons: 10, duration: '7 天' },
-      { id: 'katakana', index: '02', title: '片假名入门', subtitle: 'Katakana', description: '读写常用于外来语的片假名', lessons: 10, duration: '7 天' },
+      { id: 'hiragana', index: '01', title: '平假名与片假名入门', subtitle: 'Kana', description: '对照掌握 46 组平假名、片假名及其共同发音', lessons: 10, duration: '7 天' },
+      { id: 'katakana', index: '02', title: '片假名强化', subtitle: 'Katakana', description: '辨认片假名，并用于常见外来语', lessons: 10, duration: '7 天' },
       { id: 'greetings', index: '03', title: '问候与自我介绍', subtitle: 'Greetings', description: '完成第一次简单的日语交流', lessons: 8, duration: '6 天' },
       { id: 'sentences', index: '04', title: '第一组基础句型', subtitle: 'Basic sentences', description: '理解「は」「です」的基本用法', lessons: 12, duration: '9 天' },
     ],

@@ -47,8 +47,8 @@ export function useAuth() {
     setError('')
   }
 
-  const register = async (displayName: string, email: string, password: string) => {
-    const currentUser = await registerRequest(displayName, email, password)
+  const register = async (displayName: string, email: string, password: string, recoveryKeyword: string) => {
+    const currentUser = await registerRequest(displayName, email, password, recoveryKeyword)
     setUser(currentUser)
     setStatus('authenticated')
     setError('')

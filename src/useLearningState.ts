@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadLearningState, saveLearningState } from './api'
 import { createInitialState, getLanguagePack } from './data'
 import { scheduleCard, todayISO } from './srs'
-import type { AppState, LanguageCode, LearningStateEnvelope, QuizStat, Rating, TaskKind } from './types'
+import { DAILY_REWARD_POINTS, isThemeId, normalizeRewards, themeById } from './themes'
+import type { AppState, LanguageCode, LearningStateEnvelope, QuizStat, Rating, TaskKind, ThemeId } from './types'
 
 export type SyncStatus = 'idle' | 'loading' | 'saving' | 'synced' | 'error'
 const LEGACY_STORAGE_KEY = 'kotoba-learning-state-v1'
@@ -46,27 +47,42 @@ function migrateProfile(raw: Partial<AppState> | null, language: LanguageCode, t
 function migrateEnvelope(raw: unknown): LearningStateEnvelope {
   const today = todayISO()
   const value = raw && typeof raw === 'object' ? raw as Partial<LearningStateEnvelope> & Partial<AppState> : null
-  const isEnvelope = value?.version === 2 && value.profiles && typeof value.profiles === 'object'
+  const isEnvelope = value?.profiles && typeof value.profiles === 'object'
   const activeLanguage: LanguageCode = isEnvelope && ['ja', 'en', 'es'].includes(value.activeLanguage ?? '') ? value.activeLanguage as LanguageCode : 'ja'
   return {
-    version: 2,
+    version: 3,
     activeLanguage,
     profiles: {
       ja: migrateProfile(isEnvelope ? value.profiles?.ja ?? null : value, 'ja', today),
       en: migrateProfile(isEnvelope ? value.profiles?.en ?? null : null, 'en', today),
       es: migrateProfile(isEnvelope ? value.profiles?.es ?? null : null, 'es', today),
     },
+    rewards: normalizeRewards(isEnvelope ? value.rewards : null),
   }
 }
 
-const emptyEnvelope = migrateEnvelope(null)
+function createEmptyEnvelope() {
+  const empty = migrateEnvelope(null)
+  const storedTheme = localStorage.getItem('kotoba-theme-v1')
+  if (isThemeId(storedTheme)) empty.rewards.activeTheme = storedTheme
+  return empty
+}
 
 export function useLearningState() {
-  const [envelope, setEnvelope] = useState<LearningStateEnvelope>(emptyEnvelope)
+  const [envelope, setEnvelope] = useState<LearningStateEnvelope>(createEmptyEnvelope)
   const [loaded, setLoaded] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading')
   const [syncError, setSyncError] = useState('')
+  const [saveAttempt, setSaveAttempt] = useState(0)
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
+  const revisionRef = useRef(0)
+  const mountedRef = useRef(true)
   const state = envelope.profiles[envelope.activeLanguage]
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -83,14 +99,62 @@ export function useLearningState() {
 
   useEffect(() => {
     if (!loaded) return
+    const revision = ++revisionRef.current
+    const snapshot = envelope
     const timeout = window.setTimeout(() => {
-      setSyncStatus('saving')
-      saveLearningState(envelope).then(() => {
-        localStorage.removeItem(LEGACY_STORAGE_KEY); setSyncError(''); setSyncStatus('synced')
-      }).catch((error: Error) => { setSyncError(error.message); setSyncStatus('error') })
+      saveChainRef.current = saveChainRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (!mountedRef.current) return
+          setSyncStatus('saving')
+          try {
+            await saveLearningState(snapshot)
+            if (!mountedRef.current || revision !== revisionRef.current) return
+            localStorage.removeItem(LEGACY_STORAGE_KEY)
+            setSyncError('')
+            setSyncStatus('synced')
+          } catch (error) {
+            if (!mountedRef.current || revision !== revisionRef.current) return
+            setSyncError(error instanceof Error ? error.message : '学习数据同步失败')
+            setSyncStatus('error')
+          }
+        })
     }, 650)
     return () => window.clearTimeout(timeout)
-  }, [loaded, envelope])
+  }, [loaded, envelope, saveAttempt])
+
+  const refreshForToday = useCallback(() => {
+    const today = todayISO()
+    setEnvelope((current) => {
+      if (Object.values(current.profiles).every((profile) => profile.taskDate === today)) return current
+      return {
+        ...current,
+        profiles: {
+          ja: current.profiles.ja.taskDate === today ? current.profiles.ja : migrateProfile(current.profiles.ja, 'ja', today),
+          en: current.profiles.en.taskDate === today ? current.profiles.en : migrateProfile(current.profiles.en, 'en', today),
+          es: current.profiles.es.taskDate === today ? current.profiles.es : migrateProfile(current.profiles.es, 'es', today),
+        },
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') refreshForToday() }
+    const interval = window.setInterval(refreshForToday, 60_000)
+    window.addEventListener('focus', refreshForToday)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refreshForToday)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [loaded, refreshForToday])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = envelope.rewards.activeTheme
+    localStorage.setItem('kotoba-theme-v1', envelope.rewards.activeTheme)
+  }, [envelope.rewards.activeTheme])
 
   const updateProfile = (updater: (current: AppState) => AppState) => {
     setEnvelope((current) => ({ ...current, profiles: { ...current.profiles, [current.activeLanguage]: updater(current.profiles[current.activeLanguage]) } }))
@@ -113,5 +177,36 @@ export function useLearningState() {
   const completeLesson = () => updateProfile((current) => ({ ...current, lessonsCompleted: current.lessonsCompleted + 1 }))
   const updateSetting = <K extends keyof AppState>(key: K, value: AppState[K]) => updateProfile((current) => ({ ...current, [key]: value }))
 
-  return { state, activeLanguage: envelope.activeLanguage, loaded, syncStatus, syncError, switchLanguage, toggleTask, rateCard, recordQuiz, completeLesson, updateSetting }
+  const claimCheckIn = () => setEnvelope((current) => {
+    const today = todayISO()
+    const profile = current.profiles[current.activeLanguage]
+    if (profile.taskDate !== today || !profile.tasks.length || profile.tasks.some((task) => !task.completed) || current.rewards.checkInDates.includes(today)) return current
+    return {
+      ...current,
+      rewards: {
+        ...current.rewards,
+        points: current.rewards.points + DAILY_REWARD_POINTS,
+        checkInDates: [...current.rewards.checkInDates, today],
+      },
+    }
+  })
+
+  const selectTheme = (themeId: ThemeId) => setEnvelope((current) => {
+    const theme = themeById(themeId)
+    const unlocked = current.rewards.unlockedThemes.includes(themeId)
+    if (!unlocked && current.rewards.points < theme.cost) return current
+    return {
+      ...current,
+      rewards: {
+        ...current.rewards,
+        points: unlocked ? current.rewards.points : current.rewards.points - theme.cost,
+        unlockedThemes: unlocked ? current.rewards.unlockedThemes : [...current.rewards.unlockedThemes, themeId],
+        activeTheme: themeId,
+      },
+    }
+  })
+
+  const retrySync = () => setSaveAttempt((attempt) => attempt + 1)
+
+  return { state, rewards: envelope.rewards, activeLanguage: envelope.activeLanguage, loaded, syncStatus, syncError, switchLanguage, toggleTask, rateCard, recordQuiz, completeLesson, updateSetting, claimCheckIn, selectTheme, retrySync }
 }
